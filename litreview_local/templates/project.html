@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}{{ project.name }} — LitReview{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/">← Your projects</a></p>
+<h1>{{ project.name }}</h1>
+{% if project.description %}<p class="lead">{{ project.description }}</p>{% endif %}
+<p class="counts">
+  <span>{{ plural(stats.questions, 'question') }}</span>
+  <span>{{ plural(stats.total, 'article') }}</span>
+  <span>{{ plural(stats.pdf_done, 'PDF') }}</span>
+  <span>{{ stats.annotated }} read</span>
+</p>
+<div class="row">
+  <a class="btn btn-primary" href="/projects/{{ project.id }}/papers">Open the article list</a>
+  <a class="btn" href="#new-question">Ask a new question</a>
+  <a class="btn" href="#uploads">Add articles from their PDFs</a>
+</div>
+
+{# The work on the left; Download next on the right (under it when narrow). #}
+<div class="project-layout">
+<div class="project-main">
+
+{% include "_project_status.html" %}
+
+<section class="panel" id="questions">
+  <h2>Research questions</h2>
+  {% if questions %}
+  <ul class="rq-list">
+    {% for q in questions %}
+    {% set u = updates.get(q.id) %}
+    <li class="rq-row">
+      <div class="rq-line">
+        <a class="rq-link" href="/questions/{{ q.id }}"><span class="label-chip" title="Claude calls this question {{ q.label }} too.">{{ q.label }}</span> {{ q.headline or q.text }}</a>
+        <span class="rq-meta">
+          {{ ui.question_badge(q) }}
+          {% if q.running and question_tasks.get(q.id) %}<span class="muted small">{{ plural(question_tasks[q.id], 'task') }}</span>{% endif %}
+          <span class="muted small">{{ q.created_at | date }}</span>
+        </span>
+      </div>
+      {% if u %}
+      <div class="rq-updates">
+        {% if u.unread %}<span class="badge badge-warn" title="These PDFs are in hand but this question has never read them.">{{ plural(u.unread, 'unread PDF') }}</span>{% endif %}
+        {% if u.dangling %}<span class="badge badge-bad" title="The answer quotes passages from articles this question no longer holds. They show as unavailable until the answer is written again.">{{ plural(u.dangling, 'citation') }} without evidence</span>{% endif %}
+        {% if u.unused %}<span class="badge badge-warn" title="Passages found or added after the answer was written, so the answer has not used them yet.">{{ plural(u.unused, 'passage') }} not in the answer</span>{% endif %}
+        <form method="post" action="/questions/{{ q.id }}/run" class="inline"
+              data-confirm="Rewrite the answer to {{ q.label }} from the evidence it has? Claude reads anything not read yet, then writes the answer again - edits you made to it by hand are replaced. No new search.">
+          <input type="hidden" name="mode" value="evidence">
+          <button type="submit" class="btn btn-small">Rewrite from the evidence</button>
+        </form>
+      </div>
+      {% endif %}
+      {% if q.headline and q.headline != q.text %}<p class="muted small rq-full">{{ q.text }}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No research questions yet. Ask the first one below.</p>
+  {% endif %}
+
+  <form method="post" action="/projects/{{ project.id }}/questions" class="stack" id="new-question">
+    <div class="field ask-field">
+      {% call ui.tip_title('Ask a new question', 'tip-ask', label_for='new-question-text') -%}
+      Claude plans the search; LitReview searches
+      {% for s in project.source_list() %}{{ source_label(s) }}{% if not loop.last %}, {% endif %}{% endfor %}
+      ({{ project.fetch_per_source }} results from each); Claude ranks the best
+      {{ project.rank_top }}; LitReview downloads the top {{ project.download_top }}
+      PDFs; Claude reads them and writes a cited answer. Each step that needs
+      Claude waits until you say “{{ SAY }}”. You set how wide each search is in
+      Settings.
+      {%- endcall %}
+      <textarea id="new-question-text" name="text" rows="3" required minlength="10"
+                placeholder="Write it in plain words, e.g. Does remote work affect employee wellbeing, and through which mechanisms?"></textarea>
+    </div>
+    <div><button type="submit" class="btn btn-primary">Ask</button></div>
+  </form>
+</section>
+
+<div class="panel-pair">
+<section class="panel" id="uploads">
+  <h2>{% call ui.tip_title('Add articles from their PDFs', 'tip-uploads') %}For PDFs you have that this project does not. Each becomes an article: LitReview reads it, Claude says what it is, and LitReview looks it up in OpenAlex, Semantic Scholar and Crossref. If none of them has it, Claude looks for a web page about it.{% endcall %}</h2>
+  {% with upload_back = '/projects/' ~ project.id ~ '#uploads' %}{% include "_upload_form.html" %}{% endwith %}
+</section>
+
+<section class="panel" id="documents">
+  <h2>{% call ui.tip_title('Meta Documents', 'tip-documents') %}PDFs this review leans on
+    rather than reviews — a protocol, a coding manual, funder guidelines, a previous
+    review, your own draft. Claude can read them when it writes for you.{% endcall %}</h2>
+  {% if documents %}
+  <ul class="item-list">
+    {% for d in documents %}
+    <li class="doc-row">
+      <a href="/documents/{{ d.id }}"><strong>{{ d.title }}</strong></a>
+      {% if d.description %}<span class="muted"> — {{ d.description }}</span>{% endif %}
+      <span class="doc-meta">
+        {% if d.id in parsing_docs %}<span class="badge badge-wait">Waiting for Claude to parse it</span>
+        {% elif d.status == 'pending' %}<span class="badge badge-work">Being read…</span>
+        {% elif d.status == 'done' %}<span class="badge {{ 'badge-ok' if d.reader == 'claude' else 'badge-quiet' }}">{{ reader_label(d.reader) }}</span>
+        {% else %}<span class="badge badge-warn" title="{{ d.error or '' }}">No text yet</span>{% endif %}
+        {% if d.page_count %}<span class="muted small">{{ d.page_count }} pages</span>{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No meta documents yet.</p>
+  {% endif %}
+  <details class="disclosure"{% if not documents %} open{% endif %}>
+    <summary>Add a document</summary>
+    <form method="post" action="/projects/{{ project.id }}/documents" enctype="multipart/form-data" class="stack">
+      <div class="two-col">
+        <label class="field">Title <span class="muted">(optional)</span>
+          <input type="text" name="title" placeholder="e.g. PRISMA 2020 checklist"></label>
+        <label class="field">What it is for <span class="muted">(optional)</span>
+          <input type="text" name="description" placeholder="e.g. the reporting standard this review follows"></label>
+      </div>
+      <input type="file" name="file" accept="application/pdf,.pdf" required>
+      <div><button type="submit" class="btn">Add document</button></div>
+    </form>
+  </details>
+</section>
+
+</div>
+
+<section class="panel panel-danger" id="delete">
+  <details class="disclosure">
+    <summary>Delete this project…</summary>
+    <p>This deletes <strong>{{ project.name }}</strong> with all its questions,
+      articles, readings, documents and the PDFs in its folder. There is no undo
+      — though the backups LitReview makes each time it starts still hold it
+      (see <a href="/settings#backups">Settings</a>).</p>
+    <form method="post" action="/projects/{{ project.id }}/delete" class="row"
+          data-confirm="Delete {{ project.name }} and everything in it?">
+      <label class="field">Type the project's name to confirm
+        <input type="text" name="confirm_name" autocomplete="off" required placeholder="{{ project.name }}"></label>
+      <button type="submit" class="btn btn-danger">Delete the project</button>
+    </form>
+  </details>
+</section>
+</div>
+<aside class="project-side">
+  {% include "_download_next.html" %}
+</aside>
+</div>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Articles — {{ project.name }} — LitReview{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/projects/{{ project.id }}">← {{ project.name }}</a></p>
+<h1>Articles <span class="muted">· {{ project.name }}</span></h1>
+<p class="muted">{{ plural(listed, 'article') }} in this project.
+  Export the included ones as
+  <a href="/projects/{{ project.id }}/export/csv">CSV</a> ·
+  <a href="/projects/{{ project.id }}/export/bib">BibTeX</a> ·
+  <a href="/projects/{{ project.id }}/export/ris">RIS</a>, or all of them as
+  <a href="/projects/{{ project.id }}/export/csv?status=all">CSV</a> ·
+  <a href="/projects/{{ project.id }}/export/bib?status=all">BibTeX</a> ·
+  <a href="/projects/{{ project.id }}/export/ris?status=all">RIS</a>.
+  {% if filters.tag %}<br>Export the ones tagged “{{ filters.tag }}”:
+  <a href="/projects/{{ project.id }}/export/csv?status=all&amp;tag={{ filters.tag | urlencode }}">CSV</a> ·
+  <a href="/projects/{{ project.id }}/export/bib?status=all&amp;tag={{ filters.tag | urlencode }}">BibTeX</a> ·
+  <a href="/projects/{{ project.id }}/export/ris?status=all&amp;tag={{ filters.tag | urlencode }}">RIS</a>.{% endif %}
+</p>
+
+<form class="panel filters" method="get" action="/projects/{{ project.id }}/papers" role="search">
+  <label class="field filters-text">Find
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="Words in the title, abstract, journal or your note"></label>
+  <label class="field">Screening
+    <select name="status">
+      <option value="">Any</option>
+      {% for value, words in status_words.items() %}<option value="{{ value }}" {{ 'selected' if filters.status == value }}>{{ words }}</option>{% endfor %}
+    </select></label>
+  <label class="field">Stage
+    <select name="stage">
+      <option value="">Any</option>
+      {% for value, words in stage_words.items() %}<option value="{{ value }}" {{ 'selected' if filters.stage == value }}>{{ words }}</option>{% endfor %}
+    </select></label>
+  <label class="field">PDF
+    <select name="pdf">
+      <option value="">Any</option>
+      <option value="yes" {{ 'selected' if filters.pdf == 'yes' }}>Has a PDF</option>
+      <option value="no" {{ 'selected' if filters.pdf == 'no' }}>No PDF yet</option>
+    </select></label>
+  <label class="field">Tag
+    <select name="tag">
+      <option value="">Any</option>
+      {% for t in project_tags %}<option value="{{ t.name }}" {{ 'selected' if filters.tag and t.name | lower == filters.tag | lower }}>{{ t.name }} ({{ t.count }})</option>{% endfor %}
+    </select></label>
+  {% if questions %}
+  <label class="field">Question
+    <select name="question_id">
+      <option value="">Any</option>
+      {% for rq in questions %}<option value="{{ rq.id }}" {{ 'selected' if filters.question_id == rq.id }}>{{ rq.label }} — {{ (rq.headline or rq.text)[:48] }}</option>{% endfor %}
+    </select></label>
+  {% endif %}
+  <label class="field">Order
+    <select name="sort">
+      {% for value, words in sorts.items() %}<option value="{{ value }}" {{ 'selected' if sort == value }}>{{ words }}</option>{% endfor %}
+    </select></label>
+  <div class="filter-actions">
+    <button type="submit" class="btn">Show</button>
+    {% if filtered or sort != 'relevance' %}<a href="/projects/{{ project.id }}/papers">Clear</a>{% endif %}
+  </div>
+</form>
+
+<div class="panel-pair">
+<section class="panel" id="find-article">
+  <h2>{% call ui.tip_title('Add a known article', 'tip-find') %}Look up an article you
+    know of in the sources and in this project. A match joins the project when you keep
+    it, or file it under a question.{% endcall %}</h2>
+  <form hx-post="/projects/{{ project.id }}/find" hx-target="#project-candidates" hx-swap="outerHTML"
+        hx-indicator="#project-find-spinner" class="row">
+    <input type="text" name="query" required class="grow" aria-label="Title to look up"
+           placeholder="Its title, or a distinctive phrase from it">
+    <button type="submit" class="btn">Look it up</button>
+    <span id="project-find-spinner" class="htmx-indicator muted">Searching…</span>
+  </form>
+  <div id="project-candidates"></div>
+</section>
+<section class="panel" id="uploads">
+  <h2>{% call ui.tip_title('Add articles from their PDFs', 'tip-uploads') %}For PDFs you have that this project does not. Each becomes an article: LitReview reads it, Claude says what it is, and LitReview looks it up in OpenAlex, Semantic Scholar and Crossref. If none of them has it, Claude looks for a web page about it.{% endcall %}</h2>
+  {% with upload_back = '/projects/' ~ project.id ~ '/papers#uploads' %}{% include "_upload_form.html" %}{% endwith %}
+</section>
+</div>
+
+{% if question %}
+<p class="muted">The articles {{ question.label }}'s searches found:
+  <a href="/questions/{{ question.id }}">{{ question.headline or question.text }}</a></p>
+{% endif %}
+
+{% if papers %}
+<p class="muted small">{% if filtered %}{{ plural(total, 'article') }} match.{% else %}Showing all {{ plural(total, 'article') }}.{% endif %}
+  {% if total > papers | length %}Page {{ page }}.{% endif %}</p>
+{# Stand-alone, so the tick boxes on the cards can reach it without wrapping
+   the cards' own forms in it. #}
+<form method="post" action="/projects/{{ project.id }}/download" id="bulk-form">
+  <input type="hidden" name="next" value="{{ back }}">
+</form>
+<div class="paper-list">
+  {% for p in papers %}{% include "_paper_card.html" %}{% endfor %}
+</div>
+<div class="bulk-bar">
+  <span class="small">Tick the articles you want the PDFs of, then</span>
+  <button type="submit" form="bulk-form" class="btn btn-primary">Download selected PDFs</button>
+</div>
+{% if prev_url or next_url %}
+<nav class="pager" aria-label="Pages">
+  {% if prev_url %}<a href="{{ prev_url }}">← Previous</a>{% endif %}
+  <span class="muted">Page {{ page }}</span>
+  {% if next_url %}<a href="{{ next_url }}">Next →</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="panel">
+  {% if filtered %}
+  <p>No article matches these filters. <a href="/projects/{{ project.id }}/papers">Show all</a>.</p>
+  {% else %}
+  <p>No articles yet. Ask a research question on the <a href="/projects/{{ project.id }}">project page</a>,
+    or add articles above: look one up, or add them from their PDFs.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<datalist id="tag-options">
+  {% for t in project_tags %}<option value="{{ t.name }}">{% endfor %}
+</datalist>
+{% endblock %}

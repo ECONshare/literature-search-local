@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ p.title }} — highlights — LitReview{% endblock %}
+{% block main_class %}viewer-main{% endblock %}
+{% block content %}
+<div class="viewer">
+  <aside class="viewer-side">
+    <p class="crumbs">
+      {% if rq %}<a href="/questions/{{ rq.id }}">← {{ rq.label }}</a>
+      {% else %}<a href="/projects/{{ p.project_id }}/papers">← the article list</a>{% endif %}
+    </p>
+    <h1 class="viewer-title">{{ p.title }}</h1>
+    {% if rq %}<p class="small"><span class="label-chip">{{ rq.label }}</span> {{ rq.headline or rq.text }}</p>{% endif %}
+    {% if not has_pdf %}
+    <p class="error-text">The PDF of this article is not on this computer any more.</p>
+    {% elif not highlighted %}
+    <p class="muted small">No passage could be highlighted in this PDF, so the original is shown.</p>
+    {% endif %}
+    {% set findings = a.findings or [] %}
+    {% if a.status != 'done' %}
+    <p class="muted">This paper has not been read for the question yet{% if a.error %}: {{ a.error }}{% endif %}.</p>
+    {% elif not findings %}
+    <p class="muted">Claude read it and found nothing relevant to the question — that is a valid result.</p>
+    {% else %}
+    <p class="muted small">{{ plural(findings | length, 'passage') }}. Click one to go to its page.</p>
+    <ol class="finding-list">
+      {% for f in findings %}
+      {% set where = f.located or ('pdf' if f.matched else 'none') %}
+      <li>
+        <button type="button" class="finding" data-page="{{ f.page or 1 }}">
+          {% if f.title %}<strong>{{ f.title }}</strong>{% endif %}
+          <q>{{ f.quote }}</q>
+          <span class="small muted">p. {{ f.page or 1 }}{% if f.section %} · {{ f.section }}{% endif %}{% if f.why %} — {{ f.why }}{% endif %}</span>
+          {% if where != 'pdf' %}<span class="small located-{{ where }}">{{ located_words[where] }}</span>{% endif %}
+        </button>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+    {% if has_pdf %}
+    <p class="small"><a href="/annotations/{{ a.id }}/pdf?download=1">Download this PDF</a>
+      {% if highlighted %} · <a href="/papers/{{ p.id }}/pdf/original" target="_blank" rel="noopener">the original</a>{% endif %}</p>
+    {% endif %}
+  </aside>
+  {% if has_pdf %}
+  {# The browser's own PDF viewer, opened at the cited page. #}
+  <iframe id="pdf-frame" class="viewer-pdf" title="The PDF"
+          data-src="/annotations/{{ a.id }}/pdf"
+          src="/annotations/{{ a.id }}/pdf#page={{ first_page }}"></iframe>
+  {% endif %}
+</div>
+{% endblock %}

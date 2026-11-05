@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}What is waiting for Claude — LitReview{% endblock %}
+{% block content %}
+<h1>What is waiting for Claude</h1>
+<p class="lead">Every step that needs a model is a task here. Claude takes them in this
+  order when you ask it to; LitReview does the rest by itself in between.
+  {% if seen %}Claude last called in {{ seen.ago }}{% if seen.client %} ({{ seen.client }}){% endif %}.
+  {% else %}Claude has not connected yet — <a href="/start#claude-code">connect it</a> first.{% endif %}</p>
+
+{% if rows %}
+<section class="panel say-panel">
+  {{ ui.say_box("To have Claude do them, say this in Claude Desktop or Claude Code:") }}
+</section>
+{% endif %}
+
+{% if activity %}
+<div class="notice notice-work">
+  <p class="notice-title"><span class="spinner" aria-hidden="true"></span> LitReview is working</p>
+  <ul class="plain">{% for line in activity %}<li>{{ line }}</li>{% endfor %}</ul>
+  <p class="small muted">When it is done, it puts the next tasks here.</p>
+</div>
+{% endif %}
+
+<section class="panel">
+  <h2>Waiting <span class="muted">· {{ rows | length }}</span></h2>
+  {% if rows %}
+  <ol class="task-list">
+    {% for r in rows %}
+    {% set t = r.task %}
+    <li class="task-row{{ ' is-claimed' if r.claimed }}">
+      <div class="task-main">
+        <a href="{{ r.link }}"><strong>{{ r.about }}</strong></a>
+        <p class="small muted">{{ r.kind }} · {{ r.project.name if r.project else '' }} · queued {{ r.age }}</p>
+        {% if r.claimed %}
+        <p class="small"><span class="badge badge-work">Claude is on it</span>
+          since {{ r.claimed_ago }}{% if r.lease_until %}; if it is not finished by {{ r.lease_until.astimezone().strftime('%H:%M') }} it goes back in the queue{% endif %}.</p>
+        {% elif loop.first or (loop.index0 > 0 and rows[loop.index0 - 1].claimed) %}
+        <p class="small"><span class="badge badge-wait">Next up</span></p>
+        {% endif %}
+        {% if r.problem %}<p class="small error-text">Claude's last answer was refused ({{ plural(r.tries, 'time') }}): {{ r.problem }}</p>{% endif %}
+      </div>
+      <form method="post" action="/tasks/{{ t.id }}/drop"
+            data-confirm="Set this task aside? Claude will not do it, and the step it belongs to goes on without it. For a paper's reading, that paper is left unread.">
+        <button type="submit" class="btn btn-small" title="For a task that is stuck: the rest of its step goes on without it.">Set aside</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="small muted">Set a task aside only if it is stuck — say, Claude keeps failing at it.
+    A task Claude started but did not finish goes back in the queue by itself after
+    20 minutes.</p>
+  {% else %}
+  <p>Nothing is waiting for Claude.{% if not activity %} Ask a research question in one of
+    your <a href="/">projects</a> to start.{% endif %}</p>
+  {% endif %}
+</section>
+
+{% if recent %}
+<section class="panel">
+  <details class="disclosure">
+    <summary>Recently finished</summary>
+    <ul class="plain small">
+      {% for r in recent %}
+      <li>{% if r.task.status == 'done' %}<span class="badge badge-ok">Done</span>{% else %}<span class="badge badge-bad" title="{{ r.task.error or '' }}">Set aside</span>{% endif %}
+        <a href="{{ r.link }}">{{ r.about }}</a> <span class="muted">{{ r.when }}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
+</section>
+{% endif %}
+{% endblock %}

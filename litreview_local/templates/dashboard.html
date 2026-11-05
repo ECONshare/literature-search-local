@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Projects — LitReview{% endblock %}
+{% block content %}
+<h1>Projects</h1>
+
+{% if not overview %}
+<div class="notice notice-info empty-projects">
+  <p><strong>No projects yet.</strong> Create one below{% if not set_up %} — or, if you
+    are new to LitReview, start with <a href="/start">Getting started</a>{% endif %}.</p>
+</div>
+{% else %}
+<div class="card-grid">
+  {% for item in overview %}
+  {% set p = item.project %}{% set s = item.stats %}
+  <a class="project-card" href="/projects/{{ p.id }}">
+    <h2>{{ p.name }}</h2>
+    {% if p.description %}<p class="muted">{{ p.description }}</p>{% endif %}
+    <p class="counts">
+      <span>{{ plural(s.questions, 'question') }}</span>
+      <span>{{ plural(s.total, 'article') }}</span>
+      <span>{{ plural(s.pdf_done, 'PDF') }}</span>
+      <span>{{ s.annotated }} read</span>
+    </p>
+    {% if s.waiting_for_claude %}
+    <p><span class="badge badge-wait">{{ plural(s.waiting_for_claude, 'task') }} waiting for Claude</span></p>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<section class="panel" id="new-project">
+  <h2>New project</h2>
+  <form method="post" action="/projects" class="stack">
+    <label class="field">Name
+      <input type="text" name="name" required maxlength="200"
+             placeholder="e.g. Remote work and wellbeing">
+    </label>
+    <label class="field">What is it about? <span class="muted">(optional — Claude reads this when it plans searches)</span>
+      <input type="text" name="description"
+             placeholder="e.g. A review for chapter 2 of my thesis">
+    </label>
+    <div><button type="submit" class="btn btn-primary">Create project</button></div>
+  </form>
+</section>
+{% endblock %}

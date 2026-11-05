@@ -1,0 +1,41 @@
+{# One match of the project's article lookup. Rendered on its own after it
+   was kept, or given a PDF. #}
+{% import "_ui.html" as ui %}
+{% set p = c.paper %}
+{% set parked = p.stage == 'lookup' %}
+<li class="candidate" id="project-candidate-{{ p.id }}">
+  <strong>{{ p.title }}</strong>
+  <p class="paper-meta">{{ ui.paper_meta(p) }}{% if p.citation_count is not none %} · cited {{ p.citation_count }} times{% endif %}
+    {% set jt = journal_tiers.get(p.id) if journal_tiers else none %}
+    {% if jt is not none %}<span class="badge badge-quiet">{{ tier_label(jt) }}</span>{% endif %}</p>
+  <p class="row small">
+    {% if c.title_match %}<span class="badge {{ 'badge-ok' if c.title_match == 'exact' else 'badge-quiet' }}">{{ title_match_words.get(c.title_match, c.title_match) }}</span>{% endif %}
+    {% if parked %}<span class="badge badge-quiet">Not in the project yet</span>
+    {% else %}<span class="badge badge-ok">{{ 'Kept in the project' if kept else 'In the project' }}</span>
+      <a href="/projects/{{ project.id }}/papers?q={{ p.title[:120] | urlencode }}#paper-{{ p.id }}">its card</a>{% endif %}
+    {% if c.disregarded %}<span class="badge badge-warn">Excluded</span>{% endif %}
+    {% if c.has_pdf %}<span class="badge badge-quiet">PDF in hand{{ ' — its text is kept' if just_uploaded }}</span>
+    {% elif p.oa_url %}<span class="badge badge-quiet">Open-access copy known</span>{% endif %}
+  </p>
+  {% if p.abstract %}
+  <details class="disclosure small"><summary>Abstract</summary><p>{{ p.abstract }}</p></details>
+  {% endif %}
+  <div class="row small">
+    {% if parked %}
+    <form hx-post="/projects/{{ project.id }}/keep" hx-target="#project-candidate-{{ p.id }}" hx-swap="outerHTML">
+      <input type="hidden" name="paper_id" value="{{ p.id }}">
+      <button type="submit" class="btn btn-small">Keep it in the project</button>
+    </form>
+    {% endif %}
+    <button type="button" class="btn btn-small" hx-post="/papers/{{ p.id }}/fit"
+            hx-target="#lookup-fit-{{ p.id }}" hx-swap="innerHTML">Where does it fit?</button>
+    {% if not c.has_pdf %}
+    <form hx-post="/projects/{{ project.id }}/candidates/{{ p.id }}/upload"
+          hx-encoding="multipart/form-data" hx-target="#project-candidate-{{ p.id }}" hx-swap="outerHTML">
+      <label class="btn btn-small file-button" title="A PDF you have. The article joins the project with it.">Upload its PDF
+        <input type="file" name="file" accept="application/pdf,.pdf" required data-autosubmit></label>
+    </form>
+    {% endif %}
+  </div>
+  <div class="fit-slot" id="lookup-fit-{{ p.id }}"></div>
+</li>

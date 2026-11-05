@@ -1,0 +1,76 @@
+{# One PDF added as an article: how far finding out what it is has got, and
+   what it needs from you. Polls itself while it is being worked on. `i` is
+   the PaperIdentification. #}
+{% import "_ui.html" as ui %}
+{% set p = i.paper %}
+{% set row_url = '/projects/' ~ project.id ~ '/uploads/' ~ p.id %}
+<li class="upload-row" id="upload-{{ p.id }}"
+    {% if i.running %}hx-get="{{ row_url }}" hx-trigger="every {{ 10 if i.waiting_for_claude else 4 }}s" hx-swap="outerHTML"{% endif %}>
+  <div class="upload-head">
+    <strong>{{ p.title }}</strong>
+    {% if i.filename and i.filename != p.title %}<span class="muted small">{{ i.filename }}</span>{% endif %}
+  </div>
+
+  {% if i.status == 'done' %}
+  <p class="paper-meta">{{ ui.paper_meta(p) }} {{ ui.ident_badge(i) }}
+    · <a href="/projects/{{ project.id }}/papers?q={{ p.title | urlencode }}#paper-{{ p.id }}">its card</a></p>
+
+  {% elif i.waiting_for_claude %}
+  <p><span class="badge badge-wait">{{ ident_status(i.status) | sentence }}</span>
+    <span class="muted small">Say “{{ SAY }}” in Claude.</span></p>
+
+  {% elif i.running %}
+  <p class="muted"><span class="spinner" aria-hidden="true"></span> {{ ident_status(i.status) | sentence }}…
+    {% if i.log %}<span class="small">{{ i.log[-1].said }}</span>{% endif %}</p>
+
+  {% elif i.status == 'confirm' and i.candidate %}
+  {% set r = i.candidate.record %}
+  <div class="confirm-box">
+    <p><strong>Is this it?</strong>
+      <span class="muted">Claude picked this record, but {{ i.candidate.doubt or 'it could not be confirmed' }}, so LitReview asks you before using it.</span></p>
+    <div class="record">
+      <strong>{{ r.title }}</strong>
+      <p class="paper-meta">
+        {{ (r.authors or [])[:4] | join(', ') }}{% if (r.authors or []) | length > 4 %} et al.{% endif %}
+        {% if r.year %} · {{ r.year }}{% endif %}{% if r.venue %} · <em>{{ r.venue }}</em>{% endif %}
+        {% if r.doi %} · <a href="https://doi.org/{{ r.doi }}" target="_blank" rel="noopener">doi:{{ r.doi }}</a>
+        {% elif r.url %} · <a href="{{ r.url }}" target="_blank" rel="noopener">the record</a>{% endif %}
+        {% if r.source %} · {{ source_label(r.source) }}{% endif %}
+      </p>
+      {% if i.candidate.reason %}<p class="muted small">Claude: {{ i.candidate.reason }}</p>{% endif %}
+    </div>
+    <div class="row">
+      <form hx-post="{{ row_url }}/answer" hx-target="#upload-{{ p.id }}" hx-swap="outerHTML">
+        <input type="hidden" name="answer" value="yes">
+        <button type="submit" class="btn btn-primary">Yes, that is it</button>
+      </form>
+      <form hx-post="{{ row_url }}/answer" hx-target="#upload-{{ p.id }}" hx-swap="outerHTML">
+        <input type="hidden" name="answer" value="no">
+        <button type="submit" class="btn">No — look for it on the web</button>
+      </form>
+    </div>
+  </div>
+
+  {% elif i.status == 'failed' %}
+  <p class="error-text">{{ i.error or 'Finding out what this PDF is did not work.' }}</p>
+  <div class="row">
+    <form hx-post="{{ row_url }}/retry" hx-target="#upload-{{ p.id }}" hx-swap="outerHTML">
+      <button type="submit" class="btn btn-small">Try again</button>
+    </form>
+    <a class="small" href="/projects/{{ project.id }}/papers?q={{ p.title | urlencode }}#paper-{{ p.id }}">fill in its details yourself on its card</a>
+  </div>
+  {% endif %}
+
+  {% if i.status in ['confirm', 'failed'] and upload_removable(i) %}
+  <form hx-post="{{ row_url }}/remove" hx-target="#upload-{{ p.id }}" hx-swap="outerHTML"
+        hx-confirm="Remove this upload? The article and its PDF are deleted.">
+    <button type="submit" class="btn-link small">Remove this upload</button>
+  </form>
+  {% endif %}
+
+  {% if i.log %}
+  <details class="disclosure small"><summary>How it was identified</summary>
+    <ol class="log">{% for e in i.log %}<li><strong>{{ e.step }}.</strong> {{ e.said }}</li>{% endfor %}</ol>
+  </details>
+  {% endif %}
+</li>

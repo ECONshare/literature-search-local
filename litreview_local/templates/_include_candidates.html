@@ -1,0 +1,24 @@
+{# What came back for "Add a known article" on a question. #}
+<div id="include-results">
+  {% if not query %}
+  <p class="muted">Type a title, or a distinctive phrase from it.</p>
+  {% elif not candidates %}
+  <p class="muted">Nothing came back for “{{ query }}”. Try the exact title, or a
+    distinctive phrase from it.</p>
+  {% else %}
+  {# The rows reach this form with form="include-form", which leaves each row
+     free to carry an upload form of its own. #}
+  <form method="post" action="/questions/{{ rq.id }}/include" id="include-form"></form>
+  <p class="muted small">{{ plural(candidates | length, 'match', 'matches') }} for “{{ query }}”,
+    best first. Tick what belongs in {{ rq.label }}. Leave the score empty and Claude
+    scores it; or type one yourself (0–100).</p>
+  <ul class="item-list">
+    {% for c in candidates %}{% include "_candidate_row.html" %}{% endfor %}
+  </ul>
+  <div class="row">
+    <button type="submit" form="include-form" class="btn btn-primary">Add the ticked articles</button>
+    <span class="muted small">The app fetches their PDFs and Claude reads them for
+      {{ rq.label }}. The answer waits until you ask for a rewrite.</span>
+  </div>
+  {% endif %}
+</div>

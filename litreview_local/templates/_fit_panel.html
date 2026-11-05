@@ -1,0 +1,76 @@
+{# Where does one article fit among the project's questions? Claude's answer
+   (an assess_article task), or a waiting state until it gives one - polled
+   while it waits. Filing it posts to /projects/<id>/assign. #}
+{% import "_ui.html" as ui %}
+<div class="fit-panel" id="fit-{{ paper.id }}"
+     {% if pending %}hx-get="/papers/{{ paper.id }}/fit" hx-trigger="every 8s" hx-swap="outerHTML"{% endif %}>
+  <div class="fit-head">
+    <strong>Where does it fit?</strong>
+    <button type="button" class="btn-link small" data-remove="fit-{{ paper.id }}">Close</button>
+  </div>
+  {% if not has_questions %}
+  <p class="muted small">This project has no research questions yet, so there is nothing to
+    file the article under. Ask one on the <a href="/projects/{{ project.id }}#new-question">project page</a>.</p>
+  {% elif not scored %}
+  <div class="notice notice-wait">
+    <p class="notice-title">Waiting for Claude</p>
+    <p class="small">Claude reads the article against each of this project's questions and
+      says where it fits.</p>
+    {{ ui.say_box() }}
+  </div>
+  {% else %}
+  {% if pending %}<p class="muted small">Claude has been asked again; this is its last answer.</p>{% endif %}
+  <form method="post" action="/projects/{{ project.id }}/assign">
+    <input type="hidden" name="paper_id" value="{{ paper.id }}">
+    <input type="hidden" name="next" value="{{ back }}">
+    <ul class="fit-list">
+      {% for row in rows %}
+      {% set rq = row.rq %}
+      {% set fits = row.score is not none and row.score >= threshold %}
+      <li class="fit-row{{ ' fits' if fits }}">
+        <label class="pick">
+          <input type="checkbox" name="question_ids" value="{{ rq.id }}"
+                 {% if row.in_question or row.running %}disabled{% elif fits %}checked{% endif %}>
+          <span class="label-chip">{{ rq.label }}</span>
+          <span class="grow">{{ rq.headline or rq.text }}</span>
+          <span class="score{{ ' score-none' if row.score is none }}">{{ '%.0f' | format(row.score) if row.score is not none else '–' }}</span>
+        </label>
+        {% if row.assessment %}<p class="small muted">{{ row.assessment }}</p>{% endif %}
+        {% if row.in_question %}<p class="small muted">Already in this question.</p>
+        {% elif row.running %}<p class="small muted">This question is running; file the article under it once it is done.</p>{% endif %}
+        {% if row.score is not none %}<input type="hidden" name="score_{{ rq.id }}" value="{{ row.score }}">{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="row">
+      <button type="submit" class="btn btn-primary">File the article</button>
+      <span class="muted small">Each ticked question gets its PDF fetched and Claude reads it
+        there. Tick nothing and it stays in the project, in no question.</span>
+    </div>
+  </form>
+  {% if misfit and not suggested_question %}
+  <p class="small"><strong>This one does not seem to belong in this project.</strong>
+    {{ suggestion_reason }}</p>
+  {% elif nothing_fits and suggested_question %}
+  <div class="suggest">
+    <p class="small"><strong>None of your questions fits it well</strong> — the best score is
+      {{ '%.0f' | format(best) }}, under {{ '%.0f' | format(threshold) }}. It would answer this
+      question instead:</p>
+    <form method="post" action="/projects/{{ project.id }}/questions" class="stack"
+          data-confirm="Ask this as a new research question? That starts a full run: Claude plans a search, ranks the results, reads the best papers and writes an answer.">
+      <textarea name="text" rows="2" required>{{ suggested_question }}</textarea>
+      <div><button type="submit" class="btn">Ask this as a new question</button></div>
+    </form>
+    {% if suggestion_reason %}<p class="muted small">{{ suggestion_reason }}</p>{% endif %}
+  </div>
+  {% elif nothing_fits %}
+  <p class="muted small">None of your questions fits it well (the best score is {{ '%.0f' | format(best) }}).</p>
+  {% endif %}
+  {% if not pending %}
+  <form hx-post="/papers/{{ paper.id }}/fit" hx-target="#fit-{{ paper.id }}" hx-swap="outerHTML">
+    <input type="hidden" name="again" value="1">
+    <button type="submit" class="btn-link small">Ask Claude again</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>

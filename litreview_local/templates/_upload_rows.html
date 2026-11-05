@@ -1,0 +1,9 @@
+{# What an upload answers: one row per file, put at the top of the list. A
+   file that could not become an article says why in a row of its own. #}
+{% for row in rows %}
+{% if row.error %}
+<li class="upload-row"><p class="error-text">{{ row.error }}</p></li>
+{% elif row.ident %}
+{% with i = row.ident %}{% include "_upload_row.html" %}{% endwith %}
+{% endif %}
+{% endfor %}

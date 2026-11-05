@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}LitReview{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%232f5d8a%27/%3E%3Cpath d=%27M4 4h2v6h4v2H4z%27 fill=%27white%27/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css?v={{ version }}">
+  {# Served from this computer: the app works offline, apart from the
+     searches themselves. #}
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/app.js?v={{ version }}" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the page</a>
+  {% set here = request.url.path %}
+  <header class="topbar">
+    <a class="brand" href="/">LitReview</a>
+    <nav class="topnav" aria-label="Main">
+      <a href="/" {% if here == '/' or here.startswith('/projects') or here.startswith('/questions') or here.startswith('/documents') %}aria-current="page"{% endif %}>Projects</a>
+      <a href="/start" {% if here.startswith('/start') %}aria-current="page"{% endif %}>Getting started</a>
+      <a href="/settings" {% if here.startswith('/settings') %}aria-current="page"{% endif %}>Settings</a>
+    </nav>
+    {% include "_claude_indicator.html" %}
+  </header>
+  <main id="main" class="{% block main_class %}{% endblock %}">
+    {% block flash %}{% if flash %}
+    <div class="flash flash-{{ flash.kind }}" role="{{ 'alert' if flash.kind == 'error' else 'status' }}">{{ flash.text }}</div>
+    {% endif %}{% endblock %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    LitReview Local {{ version }} · your library is in <code>{{ library_folder() }}</code>
+  </footer>
+  <div id="toast" class="toast" role="alert" hidden></div>
+</body>
+</html>

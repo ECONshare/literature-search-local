@@ -1,0 +1,99 @@
+{# One article in the list. Every change on it is saved at once and the card
+   comes back in place. #}
+{% import "_ui.html" as ui %}
+{% set pt = texts.get(p.id) %}
+{% set idn = idents.get(p.id) %}
+{% set held = held_by.get(p.id, []) %}
+{% set has_pdf = p.pdf_status == 'downloaded' %}
+<article class="paper-card status-{{ p.status }}" id="paper-{{ p.id }}">
+  <div class="paper-top">
+    {% if not has_pdf %}
+    <input type="checkbox" name="paper_ids" value="{{ p.id }}" form="bulk-form" class="pick-box"
+           aria-label="Select “{{ p.title }}” to download its PDF">
+    {% endif %}
+    <h3 class="paper-title">{{ p.title }}</h3>
+    {% if p.llm_score is not none %}
+    <span class="score" title="Claude's relevance score{{ (': ' ~ p.llm_reason) if p.llm_reason }}">{{ p.llm_score | round | int }}</span>
+    {% endif %}
+  </div>
+  <p class="paper-meta">{{ ui.paper_meta(p, 6) }}{% if p.citation_count is not none %} · cited {{ p.citation_count }} times{% endif %}
+    {% if p.work_type and p.work_type != 'article' %}<span class="badge badge-quiet">{{ p.work_type }}</span>{% endif %}
+    {% set jt = journal_tiers.get(p.id) %}
+    {% if jt is not none %}<span class="badge badge-quiet" title="Journal rating: Norwegian Register level (2 is the top fifth of its field), or the Leiden core list">{{ tier_label(jt) }}</span>{% endif %}
+  </p>
+  <p class="row small">
+    {% if has_pdf %}
+    <a href="/papers/{{ p.id }}/pdf/original" target="_blank" rel="noopener">Open the PDF</a>
+    {{ ui.text_badge(pt, waiting=(p.id in parsing)) }}
+    {% elif p.pdf_status == 'pending' %}<span class="badge badge-work">Downloading…</span>
+    {% elif p.pdf_status == 'failed' %}<span class="badge badge-bad" title="{{ p.pdf_error or '' }}">The download failed</span>
+    {% else %}<span class="badge badge-quiet">No PDF yet</span>{% endif %}
+    {% if idn %}{{ ui.ident_badge(idn) }}{% endif %}
+    {% if held %}<span class="muted">In {% for q in held %}<a href="/questions/{{ q.id }}">{{ q.label }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
+  </p>
+  {% if card_note %}<p class="card-note card-note-{{ card_note_kind or 'ok' }}" role="status">{{ card_note }}</p>{% endif %}
+  {% if p.pdf_status == 'failed' and p.pdf_error %}<p class="small muted">{{ p.pdf_error }}</p>{% endif %}
+  {% if p.abstract %}<details class="disclosure small"><summary>Abstract</summary><p>{{ p.abstract }}</p></details>{% endif %}
+  <details class="disclosure small"><summary>Reference</summary>
+    <p class="reference" id="reference-{{ p.id }}">{% if idn and idn.status != 'done' and not p.authors %}<em>Being identified - the reference follows once LitReview knows what this PDF is.</em>{% else %}{{ reference_html(p) }}{% endif %}</p>
+    <button type="button" class="btn btn-small" data-copy-rich="#reference-{{ p.id }}">Copy the reference</button>
+  </details>
+  {% if p.llm_reason %}<p class="small muted">Claude: {{ p.llm_reason }}</p>{% endif %}
+  {% if idn and idn.log %}
+  <details class="disclosure small"><summary>How it was identified</summary>
+    <ol class="log">{% for e in idn.log %}<li><strong>{{ e.step }}.</strong> {{ e.said }}</li>{% endfor %}</ol>
+  </details>
+  {% endif %}
+
+  <div class="paper-controls">
+    <label class="inline-field">Screening
+      <select name="status" hx-post="/papers/{{ p.id }}/status" hx-trigger="change"
+              hx-target="#paper-{{ p.id }}" hx-swap="outerHTML">
+        {% for value, words in status_words.items() %}<option value="{{ value }}" {{ 'selected' if p.status == value }}>{{ words }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="inline-field grow">Note
+      <input type="text" name="note" value="{{ p.note or '' }}" placeholder="Your note on this article"
+             hx-post="/papers/{{ p.id }}/note" hx-trigger="input changed delay:700ms, change"
+             hx-target="#note-state-{{ p.id }}" hx-swap="innerHTML" maxlength="5000">
+    </label>
+    <span class="note-state small" id="note-state-{{ p.id }}" aria-live="polite"></span>
+  </div>
+
+  {% include "_paper_tags.html" %}
+
+  <div class="row small card-actions">
+    {% if p.doi %}<a href="https://doi.org/{{ p.doi }}" target="_blank" rel="noopener">DOI</a>{% endif %}
+    {% if p.url and not p.doi %}<a href="{{ p.url }}" target="_blank" rel="noopener">Web page</a>{% endif %}
+    {% if p.oa_url and not has_pdf %}<a href="{{ p.oa_url }}" target="_blank" rel="noopener">Open-access copy</a>{% endif %}
+    {% if not has_pdf %}
+    <form method="post" action="/papers/{{ p.id }}/upload-pdf" enctype="multipart/form-data">
+      <input type="hidden" name="next" value="{{ back }}#paper-{{ p.id }}">
+      <label class="btn btn-small file-button" title="A PDF you found yourself. It is read for every question that holds this article.">Upload a PDF
+        <input type="file" name="file" accept="application/pdf,.pdf" required data-autosubmit></label>
+    </form>
+    {% endif %}
+    {% if p.pdf_status == 'failed' %}
+    <button type="button" class="btn btn-small" hx-post="/papers/{{ p.id }}/retry-pdf"
+            hx-target="#paper-{{ p.id }}" hx-swap="outerHTML">Try the download again</button>
+    {% endif %}
+    {% if not has_pdf and p.doi and not p.oa_url %}
+    <button type="button" class="btn btn-small" hx-post="/papers/{{ p.id }}/find-oa"
+            hx-target="#paper-{{ p.id }}" hx-swap="outerHTML"
+            title="Ask Unpaywall for a free, legal copy">Find an open-access copy</button>
+    {% endif %}
+    {% if has_pdf and p.id not in parsing %}
+    <button type="button" class="btn btn-small" hx-post="/papers/{{ p.id }}/parse"
+            hx-target="#paper-{{ p.id }}" hx-swap="outerHTML"
+            title="Claude transcribes the pages: for a scan, or when the tables and equations matter.">{{ 'Ask Claude to parse it again' if pt and pt.reader == 'claude' else 'Ask Claude to parse it' }}</button>
+    {% endif %}
+    <button type="button" class="btn btn-small" hx-get="/papers/{{ p.id }}/edit"
+            hx-target="#paper-{{ p.id }}" hx-swap="outerHTML">Edit details</button>
+    <button type="button" class="btn btn-small" hx-post="/papers/{{ p.id }}/fit"
+            hx-target="#fit-slot-{{ p.id }}" hx-swap="innerHTML"
+            title="Claude scores the article against each research question, so you can file it">Where does it fit?</button>
+  </div>
+  <div class="fit-slot" id="fit-slot-{{ p.id }}">
+    {% if p.id in assessing %}<div hx-get="/papers/{{ p.id }}/fit" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
+  </div>
+</article>

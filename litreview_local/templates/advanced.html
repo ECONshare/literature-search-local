@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Advanced setup — LitReview{% endblock %}
+{# Other ways to connect Claude, for when the list on Getting started is not
+   enough. A message about a pane shows in that pane (?at=remove). #}
+{% block flash %}{% if flash and not flash_at %}{{ ui.flash_box(flash) }}{% endif %}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/start#claude">← Getting started</a></p>
+<h1>Advanced setup</h1>
+<p class="lead">Other ways to connect Claude, and what to do when the steps on
+  <a href="/start#claude">Getting started</a> do not work. Most people never need this page.</p>
+
+<section class="panel" id="by-hand">
+  <h2>{% call ui.tip_title('Add LitReview to Claude Desktop by hand', 'tip-by-hand') %}What the
+    Add button on Getting started does, done yourself: one entry in Claude Desktop's settings
+    file, which tells Claude Desktop to start LitReview's bridge. The rest of the file stays
+    as it is.{% endcall %}</h2>
+  {% if python_warning %}<p class="card-note card-note-warn" role="note">{{ python_warning }}</p>{% endif %}
+  <ol class="todo">
+    <li>In Claude Desktop, open <strong>Settings → Developer → Edit Config</strong>. It shows the
+      file <code>claude_desktop_config.json</code>: open it in
+      {{ 'TextEdit' if platform == 'darwin' else 'Notepad' }}.</li>
+    <li>Put this entry in the file, inside <code>"mcpServers"</code> if it has one, and save it:
+      <pre class="code" id="manual-snippet">{{ snippet }}</pre>
+      <button type="button" class="btn btn-small" data-copy-from="#manual-snippet">Copy</button></li>
+    <li>Quit Claude Desktop completely and open it again.</li>
+    <li>{{ ui.test_button('desktop') }}</li>
+  </ol>
+  {% if config_path %}<p class="small muted">LitReview found Claude Desktop's settings file here:
+    <code>{{ config_path }}</code></p>
+  {% elif candidates %}<details class="disclosure small"><summary>Where LitReview looked for Claude Desktop</summary>
+    <ul class="plain">{% for c in candidates %}<li><code>{{ c }}</code></li>{% endfor %}</ul>
+  </details>{% endif %}
+  {% if replaces %}<p class="small muted">Claude Desktop's entry for LitReview now, which this one replaces:</p>
+  <pre class="code">{{ replaces }}</pre>{% endif %}
+</section>
+
+<section class="panel" id="claude-code">
+  <h2>{% call ui.tip_title('Claude Code, other ways', 'tip-code') %}Step 2 on Getting
+    started adds LitReview to Claude Code for every folder. These add it for one folder
+    only. Claude Code talks to LitReview directly, without the bridge, so LitReview must be
+    running while you use it.{% endcall %}</h2>
+  <ol class="todo">
+    <li>Open Claude Code in LitReview's folder, and say yes when it asks about
+      <code>litreview</code>:
+      <span class="row"><code id="local-dir">{{ local_dir }}</code>
+        <button type="button" class="btn btn-small" data-copy-from="#local-dir">Copy</button></span>
+      {% if port != 8765 %}<span class="small muted">LitReview runs on port {{ port }} here: start
+        Claude Code with LITREVIEW_PORT={{ port }} set, or use the command below.</span>{% endif %}</li>
+    <li>Or, for one other folder{% if not mcp_json_exists %} (this copy has no .mcp.json){% endif %}:
+      run this once in a terminal there.
+      <pre class="code" id="code-command">{{ code_command }}</pre>
+      <button type="button" class="btn btn-small" data-copy-from="#code-command">Copy</button></li>
+    <li>{{ ui.test_button('code', primary=false) }}</li>
+  </ol>
+</section>
+
+<section class="panel" id="remove">
+  {% if flash and flash_at == 'remove' %}{{ ui.flash_box(flash) }}{% endif %}
+  <h2>Take LitReview out of Claude Desktop</h2>
+  {% if setup_missing %}
+  <p class="muted">This copy of LitReview cannot change Claude Desktop's settings itself: take the
+    “{{ desktop_name }}” entry out by hand, in <strong>Settings → Developer → Edit Config</strong>,
+    and restart Claude Desktop.</p>
+  {% elif error %}
+  <p class="muted">{{ error }}</p>
+  {% elif already or replaces or renames %}
+  <ol class="todo">
+    <li>Quit Claude Desktop completely.</li>
+    <li><form method="post" action="/connect/desktop/remove">
+        <button type="submit" class="btn">Take LitReview out of Claude Desktop</button>
+      </form></li>
+    <li>Open Claude Desktop again.</li>
+  </ol>
+  {% else %}
+  <p class="muted">LitReview is not in Claude Desktop's settings.</p>
+  {% endif %}
+</section>
+
+<section class="panel" id="help">
+  <h2>If Claude Desktop does not connect</h2>
+  <ul class="todo">
+    <li>Quit Claude Desktop completely — closing its window is not enough — open it again, and
+      test once more.</li>
+    <li>Claude Desktop's log for LitReview may say why:
+      {% if desktop_log %}<span class="row"><code id="desktop-log">{{ desktop_log }}</code>
+        <button type="button" class="btn btn-small" data-copy-from="#desktop-log">Copy</button></span>
+      {% else %}<code>mcp-server-{{ desktop_name }}.log</code> in Claude Desktop's logs folder,
+      once Claude Desktop has tried to start LitReview.{% endif %}</li>
+    <li>Claude in a web browser (claude.ai) cannot reach LitReview on your computer: use Claude
+      Desktop or Claude Code.</li>
+  </ul>
+</section>
+{% endblock %}

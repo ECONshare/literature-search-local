@@ -1,0 +1,54 @@
+{# Where the question's run has got to. Polls itself while the question runs;
+   once it settles, the route asks for a reload so the answer appears. #}
+{% import "_ui.html" as ui %}
+<div id="rq-status" class="rq-status"
+     {% if rq.running %}hx-get="/questions/{{ rq.id }}/status" hx-trigger="every {{ 4 if run.app_working else 8 }}s" hx-swap="outerHTML"{% endif %}>
+  {% if rq.running and rq.waiting_for_claude %}
+  <div class="notice notice-wait">
+    <p class="notice-title">{{ rq.status_label }}</p>
+    {% if rq.status_detail and rq.status_detail != rq.status_label %}<p>{{ rq.status_detail }}.</p>{% endif %}
+    {% if run.claimed %}
+    <p class="small">Claude has started on it. This page updates by itself.</p>
+    {% else %}
+    <p class="small">Nothing more happens until Claude does its part.</p>
+    {% endif %}
+    {{ ui.say_box() }}
+    <div class="row small">
+      <a href="/tasks">See everything that is waiting</a>
+      <form method="post" action="/questions/{{ rq.id }}/stop"
+            data-confirm="Stop {{ rq.label }}? What was collected so far stays; the tasks still waiting are withdrawn.">
+        <button type="submit" class="btn btn-small">Stop</button>
+      </form>
+    </div>
+  </div>
+  {% elif rq.running %}
+  <div class="notice notice-work">
+    <p class="notice-title"><span class="spinner" aria-hidden="true"></span> LitReview is working</p>
+    <p>{{ rq.status_detail or rq.status_label }}</p>
+    <div class="row small">
+      <span class="muted">This takes a minute or so; the page updates by itself.</span>
+      <form method="post" action="/questions/{{ rq.id }}/stop"
+            data-confirm="Stop {{ rq.label }}? What was collected so far stays.">
+        <button type="submit" class="btn btn-small">Stop</button>
+      </form>
+    </div>
+  </div>
+  {% elif rq.status == 'failed' %}
+  <div class="notice notice-bad">
+    <p class="notice-title">{{ 'Stopped' if rq.error and rq.error.startswith('Stopped') else 'This run did not finish' }}</p>
+    {% if rq.error %}<p>{{ rq.error }}</p>{% endif %}
+    <div class="row">
+      <form method="post" action="/questions/{{ rq.id }}/run">
+        <input type="hidden" name="mode" value="full">
+        <button type="submit" class="btn btn-primary">Search again</button>
+      </form>
+      <form method="post" action="/questions/{{ rq.id }}/run">
+        <input type="hidden" name="mode" value="evidence">
+        <button type="submit" class="btn">Rewrite from the evidence I have</button>
+      </form>
+    </div>
+  </div>
+  {% elif rq.status_detail %}
+  <p class="muted small run-notes">From the last run: {{ rq.status_detail }}</p>
+  {% endif %}
+</div>

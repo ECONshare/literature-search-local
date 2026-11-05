@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Getting started — LitReview{% endblock %}
+{# A message about one step shows in that step (?at=email or ?at=claude). #}
+{% block flash %}{% if flash and not flash_at %}{{ ui.flash_box(flash) }}{% endif %}{% endblock %}
+{% block content %}
+<h1>Getting started</h1>
+<p class="lead">LitReview searches, downloads and highlights papers by itself. Your own
+  Claude reads them and writes the answers, using Claude Code or the Claude Desktop app
+  and your Claude subscription. Set it up once; of steps 2 and 3, one is enough.</p>
+
+<section class="panel start-step{{ ' is-done' if contact_email }}" id="email">
+  {% if flash and flash_at == 'email' %}{{ ui.flash_box(flash) }}{% endif %}
+  <h2><span class="step-no" aria-hidden="true">1</span> Your email
+    {%- if contact_email %} <span class="badge badge-ok">Done</span>{% endif %}</h2>
+  <p>Unpaywall, which finds the free PDFs, only answers when it is given a contact
+    email. LitReview gives it to the literature services and nobody else.</p>
+  <form method="post" action="/start/email" class="row">
+    <input type="email" name="contact_email" value="{{ contact_email }}" required
+           class="input-wide" placeholder="you@university.edu" autocomplete="email"
+           aria-label="Your email">
+    <button type="submit" class="btn{{ ' btn-primary' if not contact_email }}">Save</button>
+  </form>
+</section>
+
+<section class="panel start-step{{ ' is-done' if code_called }}" id="claude-code">
+  <h2><span class="step-no" aria-hidden="true">2</span> Connect Claude Code
+    {%- if code_called %} <span class="badge badge-ok">Done</span>{% endif %}</h2>
+  {% if code_called %}<p class="small muted">Claude Code last called in {{ code_called.ago }}.</p>{% endif %}
+  <ol class="todo">
+    <li>Open Claude Code in VS Code or Positron, and paste this in:
+      <pre class="code" id="code-user-command">{{ code_command_user }}</pre>
+      <button type="button" class="btn btn-small" data-copy-from="#code-user-command">Copy</button>
+      <span class="small muted">Say yes when Claude Code asks to run it. It adds LitReview for
+        every folder, so you do it once. In a terminal it works the same.</span></li>
+    <li>Open a new Claude Code session. While LitReview is running, the new session is
+      connected to it.</li>
+    <li>{{ ui.test_button('code') }}</li>
+  </ol>
+</section>
+
+<section class="panel start-step{{ ' is-done' if desktop_called }}" id="claude">
+  {% if flash and flash_at == 'claude' %}{{ ui.flash_box(flash) }}{% endif %}
+  <h2><span class="step-no" aria-hidden="true">3</span> Connect Claude Desktop
+    {%- if desktop_called %} <span class="badge badge-ok">Done</span>{% endif %}</h2>
+  {% if desktop_called %}<p class="small muted">Claude Desktop last called in {{ desktop_called.ago }}.</p>
+  {% elif code_called %}<p class="small muted">Only if you want LitReview in Claude Desktop too:
+    Claude Code is connected.</p>{% endif %}
+
+  {% if python_warning %}<p class="card-note card-note-warn" role="note">{{ python_warning }}</p>{% endif %}
+  {% if not bridge_exists %}<p class="card-note card-note-error" role="note">The file Claude
+    Desktop starts, <code>{{ bridge_path }}</code>, is missing from this copy of LitReview,
+    so Claude Desktop cannot reach it. Download LitReview again.</p>{% endif %}
+
+  {% if setup_missing %}
+  <ol class="todo">
+    <li>Test first. If the connection already works, you can skip the rest.
+      {{ ui.test_button('desktop') }}</li>
+    <li>In Claude Desktop, open <strong>Settings → Developer → Edit Config</strong>.</li>
+    <li>Put this in the file (inside <code>"mcpServers"</code>, if it has one) and save it:
+      <pre class="code" id="manual-snippet">{{ snippet }}</pre>
+      <button type="button" class="btn btn-small" data-copy-from="#manual-snippet">Copy</button></li>
+    <li>Quit Claude Desktop completely, open it again, and press <strong>Test the
+      connection</strong> once more.</li>
+  </ol>
+
+  {% elif error %}
+  <div class="notice notice-bad">
+    <p class="notice-title">Claude Desktop's settings file cannot be changed safely</p>
+    <p>{{ error }}</p>
+    <p class="small">Nothing was written. Fix the file — Claude Desktop cannot read it
+      either — or rename it, then reload this page.</p>
+  </div>
+
+  {% elif not config_path %}
+  <div class="notice notice-warn">
+    <p class="notice-title">Claude Desktop is not installed on this computer</p>
+    <p>Install it from <a href="https://claude.ai/download" target="_blank" rel="noopener">claude.ai/download</a>,
+      open it once and sign in, then reload this page.</p>
+    {% if candidates %}
+    <details class="disclosure small"><summary>Where LitReview looked</summary>
+      <ul class="plain">{% for c in candidates %}<li><code>{{ c }}</code></li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+  </div>
+
+  {% else %}
+  <ol class="todo">
+    <li>Test first. If the connection already works, you can skip the rest.
+      {{ ui.test_button('desktop') }}</li>
+    <li>Quit Claude Desktop completely:
+      {% if platform == 'darwin' %}choose <strong>Claude › Quit Claude</strong> (⌘Q).
+      {% else %}right-click the Claude icon by the clock (it may be behind the
+        <strong>^</strong> arrow) and choose <strong>Quit</strong>.{% endif %}
+      Closing its window is not enough.</li>
+    <li>{% if already %}<p class="check check-ok">LitReview is in Claude Desktop's settings, as “{{ desktop_name }}”.</p>
+      {% else %}
+      <form method="post" action="/connect/desktop">
+        <button type="submit" class="btn btn-primary">Add LitReview to Claude Desktop</button>
+      </form>
+      <p class="small muted">{% if renames %}Claude Desktop has it under its old name,
+        “{{ renames }}”: this renames it “{{ desktop_name }}”.
+        {%- elif replaces %}This points Claude Desktop at this copy of LitReview instead of
+        the one it knows now.
+        {%- else %}Claude Desktop lists it as “{{ desktop_name }}”.{% endif %}</p>
+      {% endif %}</li>
+    <li>Open Claude Desktop again, and press <strong>Test the connection</strong> once more.</li>
+  </ol>
+  {% endif %}
+
+  <p class="small muted">Didn't work, or want to do it by hand?
+    <a href="/start/advanced">Advanced setup</a></p>
+</section>
+
+<section class="panel start-step{{ ' is-done' if questions }}" id="first">
+  <h2><span class="step-no" aria-hidden="true">4</span> Ask your first question
+    {%- if questions %} <span class="badge badge-ok">Done</span>{% endif %}</h2>
+  <ol class="todo">
+    {% if projects %}
+    <li>Open a project on <a href="/">Projects</a>, or make a new one there.</li>
+    {% else %}
+    <li>Create a project:
+      <form method="post" action="/projects" class="row">
+        <input type="text" name="name" required maxlength="200" class="input-wide"
+               placeholder="e.g. Remote work and wellbeing" aria-label="Project name">
+        <button type="submit" class="btn btn-primary">Create project</button>
+      </form></li>
+    {% endif %}
+    <li>On the project's page, write your research question and press <strong>Ask</strong>.</li>
+    <li>Then say this in Claude:
+      {{ ui.say_box(intro=none) }}
+      Claude plans the search, ranks what LitReview finds, reads the papers and writes an
+      answer with citations. The question's page shows how far it has got.</li>
+  </ol>
+  <p class="small muted">Each paper Claude reads uses some of your Claude subscription's
+    allowance. A question reads six papers unless you change that in
+    <a href="/settings#defaults">Settings</a>. In Claude Desktop, start
+    a new chat when Claude says so: LitReview's queue remembers where it was.</p>
+</section>
+{% endblock %}

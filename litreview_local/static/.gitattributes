@@ -1,0 +1,3 @@
+# The vendored htmx is kept byte for byte as published (it matches htmx's
+# own SRI hash for 1.9.12), so no checkout converts its line endings.
+htmx.min.js -text

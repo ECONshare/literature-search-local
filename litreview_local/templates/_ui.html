@@ -1,0 +1,90 @@
+{# Small pieces several pages share. Import with
+   {% import "_ui.html" as ui %}. #}
+
+{# The sentence to say in Claude, with a button that copies it. #}
+{% macro say_box(intro="In Claude Desktop or Claude Code, say:") -%}
+<div class="say-box">
+  {% if intro %}<p class="say-intro">{{ intro }}</p>{% endif %}
+  <div class="say-row">
+    <span class="say-text">“{{ SAY }}”</span>
+    <button type="button" class="btn btn-small" data-copy="{{ SAY }}">Copy</button>
+  </div>
+</div>
+{%- endmacro %}
+
+{# The one-off message a form leaves (web._redirect), for a page that shows
+   it somewhere other than the top. #}
+{% macro flash_box(flash) -%}
+<div class="flash flash-{{ flash.kind }}" role="{{ 'alert' if flash.kind == 'error' else 'status' }}">{{ flash.text }}</div>
+{%- endmacro %}
+
+{# Getting started's "Test the connection" for one Claude app ("desktop" or
+   "code"). The result (_connect_test.html) lands in the slot below it. #}
+{# A title with a hover-over: the text in the call block shows while the
+   pointer is over the title, or while its "i" has the focus (a tap, on a
+   touch screen). label_for makes the title the label of that field. #}
+{% macro tip_title(title, id, label_for=none) -%}
+<span class="has-tip">
+  {%- if label_for %}<label for="{{ label_for }}">{{ title }}</label>{% else %}{{ title }}{% endif -%}
+  <button type="button" class="tip-button" aria-label="What is this?" aria-describedby="{{ id }}">i</button>
+  <span class="tip" role="tooltip" id="{{ id }}">{{ caller() }}</span>
+</span>
+{%- endmacro %}
+
+{% macro test_button(app, primary=true) -%}
+<div class="row">
+  <button type="button" class="btn{{ ' btn-primary' if primary }}" hx-post="/connect/test/{{ app }}"
+          hx-target="#test-{{ app }}" hx-swap="innerHTML"
+          hx-indicator="#testing-{{ app }}">Test the connection</button>
+  <span id="testing-{{ app }}" class="htmx-indicator small muted"><span class="spinner" aria-hidden="true"></span> Testing…</span>
+</div>
+<div id="test-{{ app }}" class="test-slot" aria-live="polite"></div>
+{%- endmacro %}
+
+{# A question's state, in the words of its status label. Violet while it
+   waits for Claude, blue while the app works on it. #}
+{% macro question_badge(q) -%}
+{% if q.waiting_for_claude %}
+<span class="badge badge-wait" title="Nothing happens until Claude does its part.">{{ q.status_label }}</span>
+{% elif q.running %}
+<span class="badge badge-work" title="{{ q.status_detail or q.status_label }}">{{ q.status_label }}…</span>
+{% elif q.status == 'done' %}
+<span class="badge badge-ok">Done</span>
+{% else %}
+<span class="badge badge-bad" title="{{ q.error or '' }}">{{ 'Stopped' if q.error and q.error.startswith('Stopped') else 'Did not finish' }}</span>
+{% endif %}
+{%- endmacro %}
+
+{# How the text kept for a PDF was read. `pt` is a paper_texts summary. #}
+{% macro text_badge(pt, waiting=false) -%}
+{% if waiting %}
+<span class="badge badge-wait" title="Claude transcribes the pages: tables as tables, equations as LaTeX.">Waiting for Claude to parse it</span>
+{% elif pt %}
+<span class="badge {{ 'badge-ok' if pt.reader == 'claude' else 'badge-quiet' }}"
+      title="{{ 'Claude transcribed this PDF.' if pt.reader == 'claude' else "Read from the PDF's own text layer. Tables and equations may come through flattened." }} {{ pt.pages }} pages.">{{ reader_label(pt.reader) }}</span>
+{% else %}
+<span class="badge badge-warn" title="No text could be read from this PDF - it is probably a scan. Ask Claude to parse it.">No text layer</span>
+{% endif %}
+{%- endmacro %}
+
+{# Where an article added from its PDF got its details. #}
+{% macro ident_badge(idn) -%}
+{% if idn.status == 'done' %}
+<span class="badge badge-quiet" title="Added from a PDF you uploaded.">{{ outcome_label(idn) }}</span>
+{% elif idn.status == 'confirm' %}
+<a class="badge badge-warn" href="/projects/{{ idn.paper.project_id }}#uploads">Needs your answer</a>
+{% elif idn.waiting_for_claude %}
+<span class="badge badge-wait">{{ ident_status(idn.status)| sentence }}</span>
+{% elif idn.running %}
+<span class="badge badge-work">Being identified…</span>
+{% elif idn.status == 'failed' %}
+<span class="badge badge-bad" title="{{ idn.error or '' }}">Not identified</span>
+{% endif %}
+{%- endmacro %}
+
+{# "Ann Author, Bo Second · 2021 (online 2020) · Journal of Work" #}
+{% macro paper_meta(p, n=4) -%}
+{%- set who = authors(p, n) -%}
+{%- set online = years_note(p) -%}
+{{ who }}{% if p.year %}{{ ' · ' if who }}{{ p.year }}{% if online %} <span class="muted" title="The reference gives the year of the issue it appeared in.">({{ online }})</span>{% endif %}{% endif %}{% if p.venue %} · <em>{{ p.venue }}</em>{% endif %}
+{%- endmacro %}

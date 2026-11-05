@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}{{ d.title }} — LitReview{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/projects/{{ project.id }}#documents">← {{ project.name }}</a></p>
+<h1>{{ d.title }}</h1>
+{% if d.description %}<p class="lead">{{ d.description }}</p>{% endif %}
+
+<section class="panel">
+  <p class="row">
+    {% if parse_waiting %}<span class="badge badge-wait">Waiting for Claude to parse it</span>
+    {% elif d.status == 'pending' %}<span class="badge badge-work">Being read…</span>
+    {% elif d.status == 'done' %}<span class="badge {{ 'badge-ok' if d.reader == 'claude' else 'badge-quiet' }}">{{ reader_label(d.reader) }}</span>
+    {% else %}<span class="badge badge-warn">No text yet</span>{% endif %}
+    {% if d.page_count %}<span class="muted">{{ d.page_count }} pages · {{ '{:,}'.format(d.char_count or 0) }} characters</span>{% endif %}
+    {% if d.filename %}<span class="muted small">{{ d.filename }}</span>{% endif %}
+  </p>
+  {% if d.error %}<p class="error-text">{{ d.error }}</p>{% endif %}
+  {% if parse_waiting %}
+  <div class="notice notice-wait">
+    <p>Claude transcribes the pages — headings, tables as tables, equations as LaTeX — when you ask it.</p>
+    {{ ui.say_box() }}
+  </div>
+  {% endif %}
+  <div class="row">
+    {% if has_pdf %}
+    <a class="btn" href="/documents/{{ d.id }}/pdf" target="_blank" rel="noopener">Open the PDF</a>
+    {% endif %}
+    <form method="post" action="/documents/{{ d.id }}/reread">
+      <button type="submit" class="btn" title="Read the PDF's own text layer again.{{ " Claude's parse is kept." if d.reader == 'claude' else '' }}">Read it again</button>
+    </form>
+    {% if has_pdf and not parse_waiting %}
+    <form method="post" action="/documents/{{ d.id }}/parse">
+      <button type="submit" class="btn" title="For a scan, or when its tables and equations matter. Claude does it when you ask.">Ask Claude to parse it</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/documents/{{ d.id }}/delete"
+          data-confirm="Delete the document “{{ d.title }}” and its text?">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+</section>
+
+{% if outline %}
+<section class="panel">
+  <h2>Outline</h2>
+  <ul class="outline">
+    {% for h in outline %}<li class="level-{{ h.level }}">{{ h.heading }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Its text</h2>
+  {% if preview %}
+  <pre class="doc-text">{{ preview }}</pre>
+  {% if cut %}<p class="muted small">Only the beginning is shown here. Claude reads all of it.</p>{% endif %}
+  {% elif d.status == 'pending' %}
+  <p class="muted">Being read — reload the page in a moment.</p>
+  {% else %}
+  <p class="muted">There is no text yet.{% if has_pdf %} If this is a scan, ask Claude to parse it.{% endif %}</p>
+  {% endif %}
+</section>
+{% endblock %}

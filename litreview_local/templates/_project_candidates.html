@@ -1,0 +1,15 @@
+{# What came back for "Add a known article" on the article list. A match that
+   is new stays out of the project until it is kept or filed. #}
+<div id="project-candidates">
+  {% if not query %}
+  <p class="muted">Type a title, or a distinctive phrase from it.</p>
+  {% elif not candidates %}
+  <p class="muted">Nothing came back for “{{ query }}”. Try the exact title, or a
+    distinctive phrase from it.</p>
+  {% else %}
+  <p class="muted small">{{ plural(candidates | length, 'match', 'matches') }} for “{{ query }}”, best first.</p>
+  <ul class="item-list">
+    {% for c in candidates %}{% include "_project_candidate_row.html" %}{% endfor %}
+  </ul>
+  {% endif %}
+</div>

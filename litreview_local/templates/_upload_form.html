@@ -1,0 +1,18 @@
+{# Add articles from their PDFs: the file picker, which sends the PDFs at
+   once, and a row for each upload in hand. On the project page and on the
+   article list; upload_back is where a browser without JavaScript returns. #}
+<form method="post" action="/projects/{{ project.id }}/uploads" enctype="multipart/form-data"
+      hx-post="/projects/{{ project.id }}/uploads" hx-encoding="multipart/form-data"
+      hx-target="#upload-rows" hx-swap="afterbegin" hx-indicator="#upload-spinner"
+      hx-on::after-request="if (event.detail.successful) this.reset()" class="row">
+  <input type="hidden" name="next" value="{{ upload_back }}">
+  <label class="btn file-button">Choose PDFs…
+    <input type="file" name="files" accept="application/pdf,.pdf" multiple required
+           data-autosubmit>
+  </label>
+  <noscript><button type="submit" class="btn">Upload</button></noscript>
+  <span id="upload-spinner" class="htmx-indicator muted">Uploading…</span>
+</form>
+<ul id="upload-rows" class="item-list">
+  {% for i in uploads %}{% include "_upload_row.html" %}{% endfor %}
+</ul>

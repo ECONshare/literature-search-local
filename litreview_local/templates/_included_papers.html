@@ -1,0 +1,87 @@
+{# The articles this question holds, and what each is doing here. Swapped in
+   place to show every search hit and back. #}
+{% import "_ui.html" as ui %}
+<section class="panel" id="included-papers">
+  <h2>Articles in this question <span class="muted">· {{ included | length }}</span></h2>
+  {% if not included %}
+  <p class="muted">{% if show_all %}This question holds no articles yet.{% else %}Nothing
+    has been read for this question yet, and no PDF is on its way.{% endif %}
+    A run fills this in; you can also add an article yourself below.</p>
+  {% else %}
+  <p class="muted small">{% if show_all %}Everything this question's searches found{% else %}The
+    articles this question has evidence from, or is getting it from{% endif %}, best
+    score first. Taking one out of the question keeps it in the project.</p>
+  <ul class="item-list">
+    {% for row in included %}
+    {% set p = row.paper %}{% set a = row.annotation %}
+    <li class="included-row" id="included-{{ p.id }}">
+      <div class="included-head">
+        <span class="score{{ ' score-none' if row.score is none }}"
+              title="Claude's relevance score for this question, out of 100">{{ '%.0f' | format(row.score) if row.score is not none else '–' }}</span>
+        <strong>{{ p.title }}</strong>
+      </div>
+      <p class="paper-meta">{{ ui.paper_meta(p, 3) }}</p>
+      <p class="row small">
+        {% if a and a.status == 'done' %}
+        <span class="badge {{ 'badge-ok' if row.findings else 'badge-quiet' }}">Read · {{ plural(row.findings, 'passage') }}</span>
+        {% elif a and a.status == 'needs_ocr' %}
+          {% if p.id in parsing %}<span class="badge badge-wait">A scan: waiting for Claude to parse it</span>
+          {% else %}<span class="badge badge-warn" title="{{ a.error or '' }}">A scan with no text layer</span>{% endif %}
+        {% elif a and a.status == 'pending' %}
+        <span class="badge badge-wait">Waiting for Claude to read it</span>
+        {% elif a and a.status == 'failed' %}
+        <span class="badge badge-bad" title="{{ a.error or '' }}">Reading it failed</span>
+        {% elif row.has_pdf %}
+        <span class="badge badge-warn" title="Rewrite from the evidence to have Claude read it.">PDF in hand, not read yet</span>
+        {% elif p.pdf_status == 'pending' %}
+        <span class="badge badge-work">Downloading…</span>
+        {% elif p.pdf_status == 'failed' %}
+        <span class="badge badge-bad" title="{{ p.pdf_error or '' }}">No PDF: the download failed</span>
+        {% else %}
+        <span class="badge badge-quiet">No PDF</span>
+        {% endif %}
+        {% if row.cited %}<span class="badge badge-quiet" title="How many times the answer cites it">cited {{ row.cited }}×</span>{% endif %}
+        {% if a and a.status == 'done' and row.findings %}<a href="/annotations/{{ a.id }}/view" target="_blank" rel="noopener">See the highlights</a>{% endif %}
+        {% if row.has_pdf %}<a href="/papers/{{ p.id }}/pdf/original" target="_blank" rel="noopener">PDF</a>{% endif %}
+        {% if p.doi %}<a href="https://doi.org/{{ p.doi }}" target="_blank" rel="noopener">DOI</a>
+        {% elif p.url %}<a href="{{ p.url }}" target="_blank" rel="noopener">Web page</a>{% endif %}
+      </p>
+      {% if a and a.status in ['failed', 'needs_ocr'] and a.error %}<p class="small muted">{{ a.error }}</p>{% endif %}
+      <div class="row small">
+        {% if not row.has_pdf %}
+        <form method="post" action="/papers/{{ p.id }}/upload-pdf" enctype="multipart/form-data">
+          <input type="hidden" name="next" value="/questions/{{ rq.id }}#included-{{ p.id }}">
+          <label class="btn btn-small file-button" title="A PDF you found yourself. Claude reads it for this question.">Upload its PDF
+            <input type="file" name="file" accept="application/pdf,.pdf" required data-autosubmit></label>
+        </form>
+        {% endif %}
+        {% if row.has_pdf and a and a.status == 'needs_ocr' and p.id not in parsing %}
+        <form method="post" action="/papers/{{ p.id }}/parse">
+          <input type="hidden" name="next" value="/questions/{{ rq.id }}#included-{{ p.id }}">
+          <button type="submit" class="btn btn-small">Ask Claude to parse it</button>
+        </form>
+        {% endif %}
+        {% if not rq.running %}
+        <form method="post" action="/questions/{{ rq.id }}/papers/{{ p.id }}/remove"
+              data-confirm="Take “{{ p.title }}” out of {{ rq.label }}?{% if row.cited %} The answer cites it {{ row.cited }} times; those citations will show as unavailable until you rewrite the answer.{% endif %} The project keeps the article.">
+          <button type="submit" class="btn btn-small btn-quiet-danger">Take out of {{ rq.label }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if show_all %}
+  <p class="small"><button type="button" class="btn-link" hx-get="/questions/{{ rq.id }}/included"
+      hx-target="#included-papers" hx-swap="outerHTML">Show only what carries evidence</button>
+    · {{ plural(total, 'article') }} in this question's searches.</p>
+  {% elif unfetched %}
+  <p class="small muted">{{ plural(unfetched, 'more article') }} came back in this question's
+    searches and {{ 'was' if unfetched == 1 else 'were' }} not fetched.
+    <button type="button" class="btn-link" hx-get="/questions/{{ rq.id }}/included?all=1"
+            hx-target="#included-papers" hx-swap="outerHTML">Show them all</button>
+    · <a href="/projects/{{ rq.project_id }}/papers?question_id={{ rq.id }}">see them in the article list</a></p>
+  {% endif %}
+</section>

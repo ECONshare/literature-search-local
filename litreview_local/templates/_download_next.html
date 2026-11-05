@@ -1,0 +1,57 @@
+{# "Download next", on the right of a project's page: the articles worth
+   getting the PDF of, most important first (services.articles_to_get).
+   Upload PDF sends the file at once and comes back here. #}
+{% import "_ui.html" as ui %}
+<section class="panel side-panel" id="to-get">
+  <h2>{% call ui.tip_title('Download next', 'tip-to-get') %}Articles without a PDF that Claude
+    scored {{ important_score }} or more for at least one research question. One that matters
+    to more questions comes first; then the higher importance, which adds up its scores on
+    those questions. Hover over a question's score for Claude's reason. Open the article at
+    its publisher, download the PDF, and upload it here: Claude reads it for every question
+    that holds it.{% endcall %}</h2>
+  {% if to_get %}
+  {% set untried = to_get | selectattr('paper.pdf_status', 'equalto', 'none') | list %}
+  <ol class="get-list">
+    {% for a in to_get[:max_to_get] %}{% set p = a.paper %}
+    <li class="get-row">
+      <div class="get-head">
+        <a class="get-title" href="/projects/{{ project.id }}/papers?q={{ p.title | urlencode }}#paper-{{ p.id }}">{{ p.title }}</a>
+        <span class="score" title="Importance: Claude's scores on the questions it matters to, added up">{{ a.importance }}</span>
+      </div>
+      <p class="paper-meta small">{{ ui.paper_meta(p, 2) }}</p>
+      <p class="get-scores">
+        {%- for s in a.scores %}<span class="badge {{ 'badge-work' if s.important else 'badge-quiet' }}"
+          title="{{ s.question.label }}{% if s.reason %} - Claude: {{ s.reason }}{% endif %}">{{ s.question.label }} {{ s.score }}</span>{% endfor %}
+        <span class="muted small">{% if p.pdf_status == 'failed' %}<span title="{{ p.pdf_error or '' }}">The download failed</span>
+          {%- elif p.pdf_status == 'pending' %}Being downloaded…{% else %}Not downloaded yet{% endif %}</span>
+      </p>
+      <div class="row get-actions">
+        {% if p.doi %}<a class="btn btn-small" href="https://doi.org/{{ p.doi }}" target="_blank" rel="noopener">Open</a>
+        {% elif p.url %}<a class="btn btn-small" href="{{ p.url }}" target="_blank" rel="noopener">Open</a>{% endif %}
+        <form method="post" action="/papers/{{ p.id }}/upload-pdf" enctype="multipart/form-data" class="inline">
+          <input type="hidden" name="next" value="/projects/{{ project.id }}#to-get">
+          <label class="btn btn-small btn-primary file-button">Upload PDF
+            <input type="file" name="file" accept="application/pdf,.pdf" required data-autosubmit
+                   aria-label="Upload the PDF of {{ p.title }}"></label>
+          <noscript><button type="submit" class="btn btn-small">Send</button></noscript>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% if to_get | length > max_to_get %}<p class="small muted">And {{ to_get | length - max_to_get }}
+    more below these: get these first.</p>{% endif %}
+  {% if untried %}
+  <form method="post" action="/projects/{{ project.id }}/download">
+    <input type="hidden" name="next" value="/projects/{{ project.id }}#to-get">
+    {% for a in untried %}<input type="hidden" name="paper_ids" value="{{ a.paper.id }}">{% endfor %}
+    <button type="submit" class="btn btn-small">Try the automatic download for the
+      {{ plural(untried | length, 'article') }} not tried yet</button>
+  </form>
+  {% endif %}
+  {% else %}
+  <p class="muted small">Nothing to get right now. Once Claude has ranked what a question's
+    search found, the articles it scores {{ important_score }} or more that have no PDF show
+    here, most important first.</p>
+  {% endif %}
+</section>

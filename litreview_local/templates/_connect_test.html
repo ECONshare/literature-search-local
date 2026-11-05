@@ -1,0 +1,51 @@
+{# The result of "Test the connection" (web.connect_test), for t.app
+   "desktop" or "code". t.state: "ok" (Claude called in), "wait", "stopped"
+   (ten minutes and no call), "cancelled" (Stop waiting was pressed),
+   "next" (not connected yet, nothing wrong: what to do next) or "bad"
+   (what is wrong, and what to do). While it waits for Claude to call in
+   it asks again every 3 seconds; the answer stays 204 (nothing changes on
+   the page) until Claude has called in, ten minutes have gone by, or Stop
+   waiting asks once more with stop=1, which ends the asking. #}
+<div class="test-result test-{{ t.state }}"
+  {%- if t.state == 'wait' %} hx-get="/connect/test/{{ t.app }}?since={{ t.since }}"
+     hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML"{% endif %}>
+  {% for line in t.checks %}<p class="check check-ok">{{ line }}</p>{% endfor %}
+  {% if t.state == 'ok' %}
+  <p class="check check-ok"><strong>The connection works.</strong> {{ t.client }} called in {{ t.seen.ago }}.</p>
+  {% elif t.state == 'wait' %}
+  <p class="check check-wait"><span class="spinner" aria-hidden="true"></span><strong>Waiting for {{ t.client }} to call in…</strong>
+    <button type="button" class="btn btn-small"
+            hx-get="/connect/test/{{ t.app }}?since={{ t.since }}&amp;stop=1"
+            hx-target="closest .test-result" hx-swap="outerHTML">Stop waiting</button></p>
+  <p>In {{ t.client }}, {% if t.app == 'desktop' %}start a new chat and {% endif %}ask:</p>
+  <div class="say-row">
+    <span class="say-text">“{{ t.say_test }}”</span>
+    <button type="button" class="btn btn-small" data-copy="{{ t.say_test }}">Copy</button>
+  </div>
+  <p class="small muted">{% if t.app == 'desktop' -%}
+    This page notices by itself when it does. Nothing after a minute, or Claude says it
+    has no LitReview? Quit Claude Desktop completely — closing its window is not enough —
+    and open it again.
+    {%- else -%}
+    This page notices by itself when it does. Claude Code does not know LitReview? Paste
+    the command from step 2 into Claude Code, open a new session, and type /mcp to see
+    whether litreview is connected.
+    {%- endif %}</p>
+  {% elif t.state == 'cancelled' %}
+  <p class="check check-off"><strong>Stopped waiting for {{ t.client }}.</strong></p>
+  <p class="small muted">Press Test the connection to test again.</p>
+  {% elif t.state == 'next' %}
+  <p class="check check-next"><strong>{{ t.problem }}</strong></p>
+  <p>{{ t.fix }}</p>
+  {% elif t.state == 'stopped' %}
+  <p class="check check-bad"><strong>{{ t.client }} has not called in for ten minutes.</strong></p>
+  <p>{{ t.fix }}</p>
+  {% else %}
+  <p class="check check-bad"><strong>{{ t.problem }}</strong></p>
+  {% if t.detail %}<p class="small">{{ t.detail }}</p>{% endif %}
+  <p>{{ t.fix }}</p>
+  {% endif %}
+  {% if t.log and t.state in ('bad', 'stopped') %}
+  <p class="small muted">Claude Desktop's log for LitReview may say more: <code>{{ t.log }}</code></p>
+  {% endif %}
+</div>

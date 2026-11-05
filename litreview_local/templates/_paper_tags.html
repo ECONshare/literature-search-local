@@ -1,0 +1,24 @@
+{# An article's tags: remove one with its ×, add one (or several, with commas
+   between) with the project's tags offered as you type. After a change the
+   page's list of tags is updated too (out of band). #}
+<div class="tags" id="tags-{{ p.id }}">
+  {% for t in p.tags %}
+  <span class="tag">{{ t.name }}
+    <form hx-post="/papers/{{ p.id }}/tags/remove" hx-target="#tags-{{ p.id }}" hx-swap="outerHTML" class="tag-x">
+      <input type="hidden" name="name" value="{{ t.name }}">
+      <button type="submit" aria-label="Remove the tag {{ t.name }}" title="Remove this tag">×</button>
+    </form>
+  </span>
+  {% endfor %}
+  <form class="tag-add" hx-post="/papers/{{ p.id }}/tags" hx-target="#tags-{{ p.id }}" hx-swap="outerHTML">
+    <input type="text" name="name" list="tag-options" autocomplete="off" maxlength="200"
+           placeholder="Add a tag" aria-label="Add a tag to this article"
+           title="For example: to read, method: DiD, Chapter 2. Put commas between several.">
+    <button type="submit" class="btn btn-small">Add</button>
+  </form>
+</div>
+{% if oob %}
+<datalist id="tag-options" hx-swap-oob="true">
+  {% for t in project_tags %}<option value="{{ t.name }}">{% endfor %}
+</datalist>
+{% endif %}

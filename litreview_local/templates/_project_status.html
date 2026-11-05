@@ -1,0 +1,25 @@
+{# The top of a project's page: tasks waiting for Claude, with the sentence
+   to say, and what LitReview itself is doing. While LitReview works, this
+   asks again every 3 seconds (web.project_status answers 204 until something
+   changed), so the spinner stops when the work is done and the tasks it
+   made for Claude show up. #}
+{% import "_ui.html" as ui %}
+<div id="project-status"
+  {%- if activity %} hx-get="/projects/{{ project.id }}/status?seen={{ status_seen }}"
+     hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+{% if stats.waiting_for_claude %}
+<div class="notice notice-wait">
+  <p class="notice-title">{{ plural(stats.waiting_for_claude, 'task') }} in this project {{ 'is' if stats.waiting_for_claude == 1 else 'are' }} waiting for Claude</p>
+  {{ ui.say_box() }}
+  <p class="small"><a href="/tasks">See what is waiting</a></p>
+</div>
+{% endif %}
+{% if activity %}
+<div class="notice notice-work">
+  <p class="notice-title"><span class="spinner" aria-hidden="true"></span> LitReview is working</p>
+  <ul class="plain">{% for line in activity %}<li>{{ line }}</li>{% endfor %}</ul>
+  <p class="small muted">This updates by itself. When it is done, what Claude has to do
+    shows here, with what to say to Claude.</p>
+</div>
+{% endif %}
+</div>

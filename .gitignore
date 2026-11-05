@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# A library never belongs here (LitReview keeps it in ~/LitReview), nor do
+# logs, backups or downloaded PDFs.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+logs/
+backups/
+pdfs/
+settings.json
+server.json
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

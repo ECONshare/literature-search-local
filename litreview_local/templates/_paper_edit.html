@@ -1,0 +1,46 @@
+{# A card turned into a form for correcting the article's details. It keeps
+   the card's id, so Save and Cancel put the card back. `form` holds what was
+   typed when a field was refused, so nothing has to be typed twice. #}
+{% set f = form or {
+  'title': p.title, 'authors': (p.authors or []) | join('\n'),
+  'year': p.year or '', 'venue': p.venue or '', 'doi': p.doi or '',
+  'url': p.url or '', 'work_type': p.work_type or '', 'abstract': p.abstract or '',
+  'volume': p.volume or '', 'issue': p.issue or '', 'pages': p.pages or ''} %}
+<article class="paper-card paper-edit" id="paper-{{ p.id }}">
+  <form hx-post="/papers/{{ p.id }}/details" hx-target="#paper-{{ p.id }}" hx-swap="outerHTML" class="stack">
+    <h3>Edit the details</h3>
+    {% if error %}<p class="error-text" role="alert">{{ error }}</p>{% endif %}
+    <label class="field">Title
+      <input type="text" name="title" value="{{ f.title }}" required></label>
+    <label class="field">Authors <span class="muted">— one per line; an organization can be an author</span>
+      <textarea name="authors" rows="3">{{ f.authors }}</textarea></label>
+    <div class="two-col">
+      <label class="field">Year <input type="text" name="year" value="{{ f.year }}" inputmode="numeric"></label>
+      <label class="field">Type
+        <select name="work_type">
+          <option value="" {{ 'selected' if not f.work_type }}>(not set)</option>
+          {% for t in types %}<option value="{{ t }}" {{ 'selected' if f.work_type == t }}>{{ t }}</option>{% endfor %}
+          {% if f.work_type and f.work_type not in types %}<option value="{{ f.work_type }}" selected>{{ f.work_type }}</option>{% endif %}
+        </select></label>
+    </div>
+    <label class="field">Journal, series, publisher or website
+      <input type="text" name="venue" value="{{ f.venue }}"></label>
+    <div class="three-col">
+      <label class="field">Volume <input type="text" name="volume" value="{{ f.volume }}" maxlength="40"></label>
+      <label class="field">Issue <input type="text" name="issue" value="{{ f.issue }}" maxlength="40"></label>
+      <label class="field">Pages <span class="muted">— or article number</span>
+        <input type="text" name="pages" value="{{ f.pages }}" maxlength="40" placeholder="46-66"></label>
+    </div>
+    <div class="two-col">
+      <label class="field">DOI <input type="text" name="doi" value="{{ f.doi }}" placeholder="10.1234/abcd"></label>
+      <label class="field">Link <input type="text" name="url" value="{{ f.url }}" placeholder="https://…"></label>
+    </div>
+    <label class="field">Abstract
+      <textarea name="abstract" rows="4">{{ f.abstract }}</textarea></label>
+    <div class="row">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <button type="button" class="btn" hx-get="/papers/{{ p.id }}/card"
+              hx-target="#paper-{{ p.id }}" hx-swap="outerHTML">Cancel</button>
+    </div>
+  </form>
+</article>

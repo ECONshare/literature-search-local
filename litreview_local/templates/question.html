@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}{{ rq.label }}: {{ (rq.headline or rq.text)[:70] }} — LitReview{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/projects/{{ project.id }}">← {{ project.name }}</a></p>
+<h1><span class="label-chip label-chip-big" title="Claude calls this question {{ rq.label }} too.">{{ rq.label }}</span> {{ rq.headline or rq.text }}</h1>
+{% if rq.headline and rq.headline != rq.text %}<p class="lead">{{ rq.text }}</p>{% endif %}
+
+{% include "_question_status.html" %}
+
+<div class="rq-layout">
+  <div class="rq-main">
+    {% include "_question_summary.html" %}
+
+    {% if rq.summary_html and not rq.running %}
+    <section class="panel" id="change-answer">
+      <h2>Ask Claude to change the answer</h2>
+      <p class="muted small">Claude rewrites the answer as you ask, from the evidence
+        this question already has — no new search, no new reading.</p>
+      <form method="post" action="/questions/{{ rq.id }}/revise"
+            hx-post="/questions/{{ rq.id }}/revise" hx-target="#summary-block" hx-swap="outerHTML"
+            hx-on::after-request="if (event.detail.successful) this.reset()" class="stack">
+        <textarea name="instruction" rows="2" required
+                  placeholder="e.g. Shorten the second paragraph, and say more about the studies that found no effect."></textarea>
+        <div><button type="submit" class="btn">Ask Claude</button></div>
+      </form>
+    </section>
+    {% endif %}
+
+    <section class="panel" id="question">
+      <h2>Change the question, or run it again</h2>
+      <form method="post" action="/questions/{{ rq.id }}/run" class="stack"
+            {% if rq.summary_html %}data-confirm="This writes the answer again and replaces it, including any edits you made by hand. Go ahead?"{% endif %}>
+        <textarea name="text" rows="3" required minlength="10" aria-label="The research question"
+                  {% if rq.running %}disabled{% endif %}>{{ rq.text }}</textarea>
+        <div class="row">
+          <button type="submit" name="mode" value="full" class="btn btn-primary" {% if rq.running %}disabled{% endif %}>Search again</button>
+          <button type="submit" name="mode" value="evidence" class="btn" {% if rq.running %}disabled{% endif %}>Rewrite from the evidence I have</button>
+        </div>
+        {% if rq.running %}
+        <p class="muted small">Stop the run first to change the question or run it again.</p>
+        {% else %}
+        <p class="muted small"><strong>Search again</strong>: Claude plans a new search,
+          LitReview searches and downloads, Claude ranks and reads, then writes the
+          answer. <strong>Rewrite from the evidence I have</strong>: no new search —
+          Claude reads any PDF this question has not read yet, then writes the
+          answer again.</p>
+        {% endif %}
+      </form>
+      {% set plan = rq.parsed or {} %}
+      {% if plan.get('boolean') or plan.get('keywords') or plan.get('query') %}
+      <details class="disclosure small">
+        <summary>The search Claude planned</summary>
+        {% if plan.get('boolean') %}<p>Search: <code>{{ plan['boolean'] }}</code></p>
+        {% elif plan.get('query') %}<p>Search: <code>{{ plan['query'] }}</code></p>{% endif %}
+        {% if plan.get('keywords') %}<p>Keywords: {{ plan['keywords'] | join(', ') }}</p>{% endif %}
+        {% if plan.get('areas') %}<p>Fields: {{ plan['areas'] | join(', ') }}</p>{% endif %}
+        {% if plan.get('year_from') or plan.get('year_to') %}<p>Years: {{ plan.get('year_from') or '…' }}–{{ plan.get('year_to') or '…' }}</p>{% endif %}
+      </details>
+      {% endif %}
+    </section>
+
+    {% include "_included_papers.html" %}
+
+    <section class="panel" id="add-article">
+      <h2>Add a known article</h2>
+      {% if rq.running %}
+      <p class="muted">{{ rq.label }} is running. Add articles once it is done, so their
+        readings are not left out of the answer.</p>
+      {% else %}
+      <p class="muted small">For an article you know belongs here that the search did not
+        bring in. LitReview looks it up in the sources and in this project; you
+        tick what to add.</p>
+      <form hx-post="/questions/{{ rq.id }}/find" hx-target="#include-results"
+            hx-swap="outerHTML" hx-indicator="#find-spinner" class="row">
+        <input type="text" name="query" required class="grow"
+               placeholder="Its title, or a distinctive phrase from it" aria-label="Title to look up">
+        <button type="submit" class="btn">Look it up</button>
+        <span id="find-spinner" class="htmx-indicator muted">Searching…</span>
+      </form>
+      <div id="include-results"></div>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="rq-side" aria-label="Evidence">
+    <h2>Evidence</h2>
+    {% if groups %}
+    <p class="muted small">{{ plural(papers_read, 'paper') }} read{% if papers_without_findings %},
+      {{ papers_without_findings }} with nothing relevant{% endif %}. Drag a passage
+      into the answer to cite it; click it to see it in the PDF.</p>
+    {% for g in groups %}
+    <div class="ev-group">
+      <p class="ev-paper">
+        <a href="/annotations/{{ g.annotation.id }}/view" target="_blank" rel="noopener">{{ g.paper.title }}</a>
+        {% if g['items'] and g['items'][0]['info'] %}<span class="muted small">{{ g['items'][0]['info']['apa'] }}</span>{% endif %}
+      </p>
+      {% for item in g['items'] %}
+      {% set f = item['finding'] %}
+      {% set where = item['info']['located'] if item['info'] else 'none' %}
+      <div class="ann-card located-{{ where }}" draggable="true" tabindex="0"
+           data-k="{{ item['key'] }}" data-ann="{{ g.annotation.id }}" data-page="{{ f.page or 1 }}"
+           title="Drag into the answer to cite. Click to open the PDF here.">
+        <p class="ann-title">{{ f.title or 'Passage' }}</p>
+        <q>{{ f.quote }}</q>
+        <p class="small muted">p. {{ f.page or 1 }}{% if f.section %} · {{ f.section }}{% endif %}{% if f.why %} — {{ f.why }}{% endif %}</p>
+        {% if where != 'pdf' %}<p class="small located-note">{{ located_words[where] }}</p>{% endif %}
+      </div>
+      {% endfor %}
+      {% if not g['items'] %}<p class="muted small">Read — nothing relevant to this question.</p>{% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="muted">Nothing has been read yet{% if rq.running %}. Passages appear here
+      as Claude reads the papers{% endif %}.</p>
+    {% endif %}
+  </aside>
+</div>
+
+<div id="cit-popup" class="cit-popup" role="tooltip" hidden></div>
+<script id="citmap" type="application/json">{{ cmap_json | safe }}</script>
+<script src="/static/answer_text.js?v={{ version }}" defer></script>
+<script src="/static/question.js?v={{ version }}" defer></script>
+{% endblock %}

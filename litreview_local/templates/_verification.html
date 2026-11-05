@@ -1,0 +1,31 @@
+{# Claude's check of the answer's citations (a verify_answer task). The marks
+   on the citations themselves are drawn from data-verdict; this says what
+   the check found, or that it is waiting. The check is only shown while the
+   answer is the one Claude checked. Polls while the check is waiting. #}
+{% import "_ui.html" as ui %}
+{% set v = verification %}
+<div id="verification" class="verification"
+     {% if v.pending %}hx-get="/questions/{{ rq.id }}/verification" hx-trigger="every 8s" hx-swap="outerHTML"{% endif %}>
+  {% if v.pending %}
+  <div class="notice notice-wait">
+    <p class="notice-title">Waiting for Claude to check the citations</p>
+    <p class="small">Claude reads each cited passage beside the sentence that cites it, and
+      says whether it supports it.</p>
+    {{ ui.say_box() }}
+  </div>
+  {% elif v.check %}
+  {% set weak = v.counts.partial + v.counts.unsupported %}
+  <div class="notice {{ 'notice-warn' if weak else 'notice-ok' }}">
+    <p class="notice-title">Claude checked the citations {{ v.check.checked_at | ago }}</p>
+    <p class="small">{{ v.counts.supported }} supported{% if v.counts.partial %} · {{ v.counts.partial }} only partly{% endif %}{% if v.counts.unsupported %} · {{ v.counts.unsupported }} not supported{% endif %}.
+      {% if weak %}The marked citations carry Claude's note: hover one to read it.{% endif %}</p>
+    {% if v.check.overall %}<p>{{ v.check.overall }}</p>{% endif %}
+  </div>
+  {% endif %}
+  {% if v.checkable and not v.pending and not revision | default(none) %}
+  <form method="post" action="/questions/{{ rq.id }}/verify" class="verify-form">
+    <button type="submit" class="btn btn-small">{{ 'Ask Claude to check again' if v.check else 'Ask Claude to check the citations' }}</button>
+    <span class="muted small">Claude compares every citation with its passage.</span>
+  </form>
+  {% endif %}
+</div>

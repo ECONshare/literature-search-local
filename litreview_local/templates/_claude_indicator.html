@@ -1,0 +1,16 @@
+{# The header's Claude indicator: when Claude last called in, and how much is
+   waiting for it. Polls itself every 30 seconds; links to the queue. An
+   error page renders without the figures and fetches them at once. #}
+{% set ind = indicator | default(none) %}
+{% set seen = ind.seen if ind else none %}
+<a id="claude-indicator" href="{{ '/start#claude-code' if ind and not seen else '/tasks' }}"
+   class="claude-indicator{% if seen and seen.recent %} is-recent{% endif %}{% if ind and ind.waiting %} has-waiting{% endif %}"
+   hx-get="/claude-status" hx-trigger="{{ 'every 30s' if ind else 'load, every 30s' }}" hx-swap="outerHTML"
+   title="{{ 'Connect Claude' if ind and not seen else 'What is waiting for Claude' }}">
+  <span class="dot" aria-hidden="true"></span>
+  {%- if not ind %}<span>Claude</span>
+  {%- elif seen %}<span>Claude: last seen {{ seen.ago }}</span>
+  {%- else %}<span>Claude has not connected yet</span>
+  {%- endif %}
+  {%- if ind and ind.waiting %}<span class="sep" aria-hidden="true">·</span><span>{{ plural(ind.waiting, 'task') }} waiting</span>{% endif %}
+</a>

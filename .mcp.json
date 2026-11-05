@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "litreview": {
+      "type": "http",
+      "url": "http://127.0.0.1:${LITREVIEW_PORT:-8765}/mcp"
+    }
+  }
+}

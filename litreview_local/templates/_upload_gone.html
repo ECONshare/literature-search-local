@@ -1,0 +1,14 @@
+{# An upload that is no longer an article of its own - usually because it
+   turned out to be one the project already had, and was folded into it.
+   No polling here, so the row stops asking. #}
+<li class="upload-row" id="upload-{{ paper_id }}">
+  {% if twin %}
+  <div class="upload-head"><strong>{{ twin.title }}</strong></div>
+  <p class="paper-meta">
+    {% if twin_ident and twin_ident.log %}{{ twin_ident.log[-1].said }}{% else %}This project had it already, so the PDF went onto that article.{% endif %}
+    · <a href="/projects/{{ project.id }}/papers?q={{ twin.title | urlencode }}#paper-{{ twin.id }}">its card</a>
+  </p>
+  {% else %}
+  <p class="muted">This upload is no longer here.</p>
+  {% endif %}
+</li>

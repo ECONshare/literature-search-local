@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Settings — LitReview{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<p class="lead">Connecting Claude, and testing the connection, is on
+  <a href="/start#claude-code">Getting started</a>. Other ways, and help when Claude does not
+  connect, are on <a href="/start/advanced">Advanced setup</a>.</p>
+
+<form method="post" action="/settings" class="panel stack" id="email">
+  <h2>Your contact email</h2>
+  <p class="small">OpenAlex, Crossref and Unpaywall ask the apps that use them for a contact
+    address, and <strong>Unpaywall — which finds free PDFs — refuses requests without
+    one</strong>. LitReview sends it to those services only.</p>
+  <label class="field">Email
+    <input type="email" name="contact_email" value="{{ values.contact_email }}"
+           placeholder="you@university.edu" autocomplete="email"></label>
+
+  <h2 id="s2">Semantic Scholar key <span class="muted">(optional)</span></h2>
+  <p class="small">Without one, Semantic Scholar answers more slowly and may turn requests
+    away when it is busy. A free key is available from
+    <a href="https://www.semanticscholar.org/product/api" target="_blank" rel="noopener">semanticscholar.org</a>.</p>
+  <div class="field">
+    <label for="s2-api-key">API key</label>
+    <span class="secret-input">
+      <input type="password" id="s2-api-key" name="s2_api_key" value="{{ values.s2_api_key }}"
+             autocomplete="off" spellcheck="false" autocapitalize="off">
+      <button type="button" class="secret-toggle" data-reveal="s2-api-key"
+              data-show="Show the key" data-hide="Hide the key"
+              aria-label="Show the key" title="Show the key">
+        <svg class="icon-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="icon-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg>
+      </button>
+    </span>
+  </div>
+
+  <h2 id="defaults">How wide each search is</h2>
+  <p class="small">For every question, in every project. Every result Claude ranks and every
+    paper it reads is work in your Claude subscription, so the numbers start modest.</p>
+  {% if differ %}<p class="card-note card-note-warn small" role="note">{{ differ | join(', ') }}
+    {{ 'has' if differ | length == 1 else 'have' }} numbers or sources of {{ 'its' if differ | length == 1 else 'their' }}
+    own, set before. Saving these settings gives every project the ones below.</p>{% endif %}
+  <div class="three-col">
+    <label class="field">Results from each source
+      <input type="number" name="fetch_per_source" min="1" max="500" value="{{ values.fetch_per_source }}"></label>
+    <label class="field">Results Claude ranks
+      <input type="number" name="rank_top" min="1" max="500" value="{{ values.rank_top }}"></label>
+    <label class="field">Papers Claude reads
+      <input type="number" name="download_top" min="1" max="100" value="{{ values.download_top }}"></label>
+  </div>
+  <fieldset class="checks">
+    <legend>Search these sources</legend>
+    <input type="hidden" name="sources_shown" value="1">
+    {% for key, label in (source_labels or {}).items() %}
+    <label><input type="checkbox" name="sources" value="{{ key }}" {% if key in (sources or []) %}checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+  </fieldset>
+  <div><button type="submit" class="btn btn-primary">Save settings</button></div>
+</form>
+
+<section class="panel" id="data">
+  <h2>Where your library is</h2>
+  <p><code id="data-dir">{{ data_dir }}</code>
+    <button type="button" class="btn btn-small" data-copy-from="#data-dir">Copy</button></p>
+  <p class="small">Everything is in that folder: the database (<code>litreview.db</code>), the
+    PDFs (<code>pdfs</code>), these settings (<code>settings.json</code>), the backups and the
+    logs. {% if from_env %}It was chosen with <code>LITREVIEW_DATA_DIR</code>.{% endif %}</p>
+  <details class="disclosure">
+    <summary>Moving it somewhere else</summary>
+    <ol class="small">
+      <li>Quit LitReview (the button below).</li>
+      <li>Move the whole folder where you want it.</li>
+      <li>Tell LitReview where it is now, with the <code>LITREVIEW_DATA_DIR</code> setting:
+        {% if platform == 'win32' %}
+        open Command Prompt and run <code>setx LITREVIEW_DATA_DIR "D:\Research\LitReview"</code>
+        (with your folder), then start LitReview again.
+        {% elif platform == 'darwin' %}
+        add the line <code>export LITREVIEW_DATA_DIR="$HOME/Documents/LitReview"</code> (with your
+        folder) to the file <code>~/.zprofile</code>, then start LitReview again.
+        {% else %}
+        set it in your shell's profile, e.g. <code>export LITREVIEW_DATA_DIR="$HOME/LitReview"</code>.
+        {% endif %}
+        Starting LitReview with <code>--data-dir "&lt;folder&gt;"</code> does the same.</li>
+      <li>If you use Claude Desktop, press <strong>Add LitReview to Claude Desktop</strong> on
+        <a href="/start#claude">Getting started</a> again afterwards, so Claude Desktop knows the
+        new place too.</li>
+    </ol>
+    <p class="small muted">Without the setting, LitReview uses <code>{{ default_data_dir }}</code>.</p>
+  </details>
+</section>
+
+<section class="panel" id="backups">
+  <h2>Backups</h2>
+  <p class="small">Each time LitReview starts, it copies the database into
+    <code>{{ backups_dir }}</code> and keeps the last ten.
+    {% if backups %}The newest is from {{ backups[0].when.strftime('%d %b %Y, %H:%M') }}
+    ({{ plural(backups | length, 'copy', 'copies') }} in all).
+    {% else %}There are none yet: the first is made the next time LitReview starts.{% endif %}</p>
+  <p class="small">The backups hold the database, not the PDFs: to keep everything, copy the
+    whole library folder. To go back to a backup, quit LitReview, put the backup in place of
+    <code>litreview.db</code> (renamed to that), and start LitReview again.</p>
+  <p class="small muted">Logs, if something goes wrong: <code>{{ logs_dir }}</code></p>
+</section>
+
+<section class="panel" id="quit">
+  <h2>Quit LitReview</h2>
+  <p class="small">Stops the app. Everything is saved as you go, so nothing is lost, and work
+    in progress carries on the next time it starts. Claude Desktop starts LitReview again by
+    itself when you ask it something about your review.</p>
+  <button type="button" class="btn" data-quit>Quit LitReview</button>
+  <p class="small" data-quit-result hidden></p>
+</section>
+{% endblock %}

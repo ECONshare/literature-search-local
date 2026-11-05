@@ -1,0 +1,41 @@
+{# One match of a question's article lookup. Also rendered on its own after a
+   PDF was uploaded from it. `c` comes from research.find_candidates (or
+   candidate_state, which has no title_match). #}
+{% import "_ui.html" as ui %}
+{% set p = c.paper %}
+<li class="candidate{{ ' candidate-in' if c.in_question }}" id="candidate-{{ p.id }}">
+  <label class="pick">
+    <input type="checkbox" name="paper_ids" value="{{ p.id }}" form="include-form"
+           {% if c.in_question %}disabled{% endif %}>
+    <strong>{{ p.title }}</strong>
+  </label>
+  <p class="paper-meta">{{ ui.paper_meta(p) }}{% if p.citation_count is not none %} · cited {{ p.citation_count }} times{% endif %}
+    {% set jt = journal_tiers.get(p.id) if journal_tiers else none %}
+    {% if jt is not none %}<span class="badge badge-quiet" title="Journal rating: Norwegian Register level, or the Leiden core list">{{ tier_label(jt) }}</span>{% endif %}</p>
+  <p class="row small">
+    {% if c.title_match %}<span class="badge {{ 'badge-ok' if c.title_match == 'exact' else 'badge-quiet' }}">{{ title_match_words.get(c.title_match, c.title_match) }}</span>{% endif %}
+    {% if c.in_question %}<span class="badge badge-ok">Already in this question{{ ' · read' if c.already_read }}</span>
+    {% elif c.disregarded %}<span class="badge badge-warn">Excluded — ticking it brings it back</span>{% endif %}
+    {% if c.has_pdf %}<span class="badge badge-quiet">PDF in hand{{ ' — being read for this question' if just_uploaded and c.in_question }}</span>
+    {% elif p.oa_url %}<span class="badge badge-quiet">Open-access copy known</span>
+    {% else %}<span class="badge badge-quiet" title="No free copy is known. The app tries anyway; if that fails, upload the PDF here.">May need your PDF</span>{% endif %}
+  </p>
+  {% if p.abstract %}
+  <details class="disclosure small"><summary>Abstract</summary><p>{{ p.abstract }}</p></details>
+  {% endif %}
+  <div class="row small">
+    {% if not c.in_question %}
+    <label class="score-field">Score
+      <input type="number" name="score_{{ p.id }}" min="0" max="100" step="1"
+             form="include-form" placeholder="Claude">
+    </label>
+    {% endif %}
+    {% if not c.has_pdf %}
+    <form hx-post="/questions/{{ rq.id }}/candidates/{{ p.id }}/upload"
+          hx-encoding="multipart/form-data" hx-target="#candidate-{{ p.id }}" hx-swap="outerHTML">
+      <label class="btn btn-small file-button" title="A PDF you have. It is read for every question that holds this article.">Upload its PDF
+        <input type="file" name="file" accept="application/pdf,.pdf" required data-autosubmit></label>
+    </form>
+    {% endif %}
+  </div>
+</li>

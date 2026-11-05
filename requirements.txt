@@ -1,0 +1,11 @@
+# Runtime dependencies of LitReview Local. The launcher reinstalls them into
+# local/.venv whenever this file changes.
+fastapi>=0.111,<1.0
+uvicorn>=0.30
+jinja2>=3.1
+sqlalchemy>=2.0,<3.0
+httpx>=0.27
+python-multipart>=0.0.9
+pymupdf>=1.24.3
+pydantic>=2.7
+itsdangerous>=2.1

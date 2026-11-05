@@ -1,0 +1,78 @@
+{# The answer: editable in place, with citations that show their passage on
+   hover and open the highlighted PDF on click. Swapped whole after a save,
+   and polled while Claude is changing it (it cannot be edited meanwhile). #}
+{% import "_ui.html" as ui %}
+<section class="panel answer-panel" id="summary-block">
+  <div class="answer-head">
+    <h2>Answer</h2>
+    {% if summary_html %}
+    <div class="answer-tools">
+      <button type="button" class="btn btn-small" data-answer-copy
+              title="Citations placed before the full stop, and merged: (A, 2021; B, 2022)">Copy as text</button>
+      {% if references %}<button type="button" class="btn btn-small" data-copy-rich="#reference-list"
+              title="With the italics, for pasting into a manuscript">Copy references</button>{% endif %}
+      <button type="button" class="btn btn-small" data-read-aloud hidden>Read aloud</button>
+      <button type="button" class="btn btn-small" data-read-stop hidden>Stop reading</button>
+    </div>
+    {% endif %}
+  </div>
+  {% if summary_html %}
+  <p class="export-links small">Export with evidence
+    (<a href="/questions/{{ rq.id }}/export/evidence.html" target="_blank" rel="noopener">HTML</a> /
+    <a href="/questions/{{ rq.id }}/export/evidence.md">Markdown</a>) — the answer with every
+    citation's passage, page and a link to the highlighted PDF.</p>
+  {% endif %}
+
+  {% if conflict %}
+  <div class="notice notice-bad" role="alert">
+    <p class="notice-title">Not saved</p>
+    <p>{{ conflict }}</p>
+    {% if rejected_html %}<div class="rejected">{{ rejected_html | clean_answer }}</div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if revision %}
+  <div class="notice notice-wait" hx-get="/questions/{{ rq.id }}/summary" hx-trigger="every 5s"
+       hx-target="#summary-block" hx-swap="outerHTML">
+    <p class="notice-title">Waiting for Claude to change the answer</p>
+    <p>You asked: “{{ (revision.payload or {}).get('instruction', '') }}”</p>
+    {{ ui.say_box() }}
+    <p class="small muted">The answer below stays as it is, and cannot be edited, until
+      Claude's version arrives.
+      <button type="button" class="btn-link" hx-post="/questions/{{ rq.id }}/revise/cancel"
+              hx-target="#summary-block" hx-swap="outerHTML">Cancel the request</button></p>
+  </div>
+  {% endif %}
+
+  {% if summary_html %}
+  <div id="summary-editor" class="answer-text"{% if not revision %} contenteditable="true"{% endif %}
+       spellcheck="true" lang="en" data-question="{{ rq.id }}">{{ summary_html | safe }}</div>
+  {% if not revision %}
+  <div class="row answer-save">
+    <form hx-post="/questions/{{ rq.id }}/summary" hx-target="#summary-block"
+          hx-swap="outerHTML" id="summary-save-form">
+      <input type="hidden" name="summary_html" value="">
+      <input type="hidden" name="summary_base" value="{{ summary_base }}">
+      <button type="submit" class="btn">Save edits</button>
+    </form>
+    <span class="dirty-note small" data-dirty hidden>Unsaved changes</span>
+    {% if saved %}<span class="saved small" role="status">Saved</span>{% endif %}
+  </div>
+  <p class="muted small">Edit the text directly. Drag a passage from the Evidence list into
+    the text to cite it. Hover a citation to see its passage; click it to open the PDF there.</p>
+  {% endif %}
+  {% include "_verification.html" %}
+  {% else %}
+  <p class="muted">No answer yet.
+    {% if rq.running %}Claude writes it once the papers have been read.
+    {% else %}Run the question below to get one.{% endif %}</p>
+  {% endif %}
+
+  {% if references %}
+  <h3>References</h3>
+  <ol class="references" id="reference-list">
+    {% for paper in references %}<li>{{ reference_html(paper) }}</li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</section>
